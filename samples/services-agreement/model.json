@@ -1,0 +1,450 @@
+{
+  "format": "lawdocs/1",
+  "source": "services-agreement.docx",
+  "warnings": [
+    "Accepted 1 tracked insertions and 1 tracked deletions as shown.",
+    "Converted 4 hand-typed numbers into structure.",
+    "Kept 2 bulleted paragraphs as text."
+  ],
+  "blocks": [
+    {
+      "id": "b0001",
+      "kind": "title",
+      "level": 0,
+      "runs": [
+        {
+          "text": "MASTER SERVICES AGREEMENT"
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0002",
+      "kind": "text",
+      "level": 0,
+      "runs": [
+        {
+          "text": "This Master Services Agreement (this \"Agreement\") is entered into by Acme Corp. (\"Customer\") and Widget LLC (\"Provider\")."
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0003",
+      "kind": "heading",
+      "level": 0,
+      "runs": [
+        {
+          "text": "RECITALS"
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0004",
+      "kind": "text",
+      "level": 0,
+      "runs": [
+        {
+          "text": "Customer wishes to engage Provider to perform the Services."
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0005",
+      "kind": "clause",
+      "level": 1,
+      "number": "1.",
+      "source_number": "1.",
+      "caption": "Definitions",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0006",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "In this Agreement:"
+        }
+      ],
+      "number": "1.1",
+      "source_number": "1.1",
+      "caption": "Defined Terms",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0007",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "\"Affiliate\"",
+          "bold": true
+        },
+        {
+          "text": " means any entity that controls, is controlled by, or is under common control with a party;"
+        }
+      ],
+      "number": "(a)",
+      "source_number": "(a)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0008",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "\"Services\"",
+          "bold": true
+        },
+        {
+          "text": " means the services described in Section 2.1; and"
+        }
+      ],
+      "number": "(b)",
+      "source_number": "(b)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0009",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "\"Fees\"",
+          "bold": true
+        },
+        {
+          "text": " means the amounts set out in Schedule 1."
+        }
+      ],
+      "number": "(c)",
+      "source_number": "(c)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0010",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Headings are for convenience only."
+        }
+      ],
+      "number": "1.2",
+      "source_number": "1.2",
+      "caption": "Interpretation",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0011",
+      "kind": "clause",
+      "level": 1,
+      "number": "2.",
+      "source_number": "2.",
+      "caption": "Services",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0012",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Provider shall perform the Services:"
+        }
+      ],
+      "number": "2.1",
+      "source_number": "2.1",
+      "caption": "Performance",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0013",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "in a professional manner;"
+        }
+      ],
+      "number": "(a)",
+      "source_number": "(a)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0014",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "in accordance with applicable law, including:"
+        }
+      ],
+      "number": "(b)",
+      "source_number": "(b)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0015",
+      "kind": "clause",
+      "level": 4,
+      "runs": [
+        {
+          "text": "data protection law; and"
+        }
+      ],
+      "number": "(i)",
+      "source_number": "(i)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0016",
+      "kind": "clause",
+      "level": 4,
+      "runs": [
+        {
+          "text": "export control law; and"
+        }
+      ],
+      "number": "(ii)",
+      "source_number": "(ii)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0017",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "on the timeline agreed by the parties."
+        }
+      ],
+      "number": "(c)",
+      "source_number": "(c)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0018",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Provider shall assign qualified personnel. Provider may subcontract with Customer's consent."
+        }
+      ],
+      "number": "2.2",
+      "source_number": "2.2",
+      "caption": "Personnel",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0019",
+      "kind": "text",
+      "level": 2,
+      "runs": [
+        {
+          "text": "This sentence continues Section 2.2 as an unnumbered paragraph."
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0020",
+      "kind": "clause",
+      "level": 1,
+      "number": "3.",
+      "source_number": "3.",
+      "caption": "Fees",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0021",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Customer shall pay the Fees within 30 days of invoice."
+        }
+      ],
+      "number": "3.1",
+      "source_number": "3.1",
+      "caption": "Payment",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0022",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Late amounts bear interest at 1% per month, provided that:"
+        }
+      ],
+      "number": "3.2",
+      "source_number": "3.2",
+      "caption": "Late Payment",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0023",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "interest shall not exceed the maximum rate permitted by law; and"
+        }
+      ],
+      "number": "(a)",
+      "source_number": "(a)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0024",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "no interest accrues on amounts disputed under Section 3.3."
+        }
+      ],
+      "number": "(b)",
+      "source_number": "(b)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0025",
+      "kind": "text",
+      "level": 3,
+      "runs": [
+        {
+          "text": "Invoices are delivered:"
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0026",
+      "kind": "text",
+      "level": 3,
+      "runs": [
+        {
+          "text": "• "
+        },
+        {
+          "text": "by email; or"
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0027",
+      "kind": "text",
+      "level": 3,
+      "runs": [
+        {
+          "text": "• "
+        },
+        {
+          "text": "by courier."
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0028",
+      "kind": "clause",
+      "level": 1,
+      "number": "4.",
+      "source_number": "4.",
+      "caption": "Term",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0029",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "This Agreement continues until terminated under Section 4.2."
+        }
+      ],
+      "number": "4.1",
+      "source_number": "4.1",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0030",
+      "kind": "clause",
+      "level": 2,
+      "runs": [
+        {
+          "text": "Either party may terminate on 30 days' notice, in which case:"
+        }
+      ],
+      "number": "4.2",
+      "source_number": "4.2",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0031",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "Customer pays for Services performed;"
+        }
+      ],
+      "number": "(a)",
+      "source_number": "(a)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0032",
+      "kind": "clause",
+      "level": 3,
+      "runs": [
+        {
+          "text": "Provider returns Customer materials."
+        }
+      ],
+      "number": "(b)",
+      "source_number": "(b)",
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0033",
+      "kind": "heading",
+      "level": 0,
+      "runs": [
+        {
+          "text": "SCHEDULE 1"
+        }
+      ],
+      "author": "import:services-agreement.docx"
+    },
+    {
+      "id": "b0034",
+      "kind": "table",
+      "level": 0,
+      "rows": [
+        [
+          "Service",
+          "Fee (USD)"
+        ],
+        [
+          "Implementation",
+          "50,000"
+        ],
+        [
+          "Support (per month)",
+          "5,000"
+        ]
+      ],
+      "author": "import:services-agreement.docx"
+    }
+  ]
+}

@@ -1,0 +1,194 @@
+[
+  {
+    "block": "b0001",
+    "ref": null,
+    "level": 0,
+    "caption": "MASTER SERVICES AGREEMENT",
+    "gist": null,
+    "kind": "title"
+  },
+  {
+    "block": "b0003",
+    "ref": null,
+    "level": 0,
+    "caption": "RECITALS",
+    "gist": null,
+    "kind": "heading"
+  },
+  {
+    "block": "b0005",
+    "ref": "1",
+    "level": 1,
+    "caption": "Definitions",
+    "gist": null
+  },
+  {
+    "block": "b0006",
+    "ref": "1.1",
+    "level": 2,
+    "caption": "Defined Terms",
+    "gist": "In this Agreement:"
+  },
+  {
+    "block": "b0007",
+    "ref": "1.1(a)",
+    "level": 3,
+    "caption": null,
+    "gist": "\"Affiliate\" means any entity that controls, is controlled by, or is under …"
+  },
+  {
+    "block": "b0008",
+    "ref": "1.1(b)",
+    "level": 3,
+    "caption": null,
+    "gist": "\"Services\" means the services described in Section 2.1; and"
+  },
+  {
+    "block": "b0009",
+    "ref": "1.1(c)",
+    "level": 3,
+    "caption": null,
+    "gist": "\"Fees\" means the amounts set out in Schedule 1."
+  },
+  {
+    "block": "b0010",
+    "ref": "1.2",
+    "level": 2,
+    "caption": "Interpretation",
+    "gist": "Headings are for convenience only."
+  },
+  {
+    "block": "b0011",
+    "ref": "2",
+    "level": 1,
+    "caption": "Services",
+    "gist": null
+  },
+  {
+    "block": "b0012",
+    "ref": "2.1",
+    "level": 2,
+    "caption": "Performance",
+    "gist": "Provider shall perform the Services:"
+  },
+  {
+    "block": "b0013",
+    "ref": "2.1(a)",
+    "level": 3,
+    "caption": null,
+    "gist": "in a professional manner;"
+  },
+  {
+    "block": "b0014",
+    "ref": "2.1(b)",
+    "level": 3,
+    "caption": null,
+    "gist": "in accordance with applicable law, including:"
+  },
+  {
+    "block": "b0015",
+    "ref": "2.1(b)(i)",
+    "level": 4,
+    "caption": null,
+    "gist": "data protection law; and"
+  },
+  {
+    "block": "b0016",
+    "ref": "2.1(b)(ii)",
+    "level": 4,
+    "caption": null,
+    "gist": "export control law; and"
+  },
+  {
+    "block": "b0017",
+    "ref": "2.1(c)",
+    "level": 3,
+    "caption": null,
+    "gist": "on the timeline agreed by the parties."
+  },
+  {
+    "block": "b0018",
+    "ref": "2.2",
+    "level": 2,
+    "caption": "Personnel",
+    "gist": "Provider shall assign qualified personnel. Provider may subcontract with Customer's consent."
+  },
+  {
+    "block": "b0020",
+    "ref": "3",
+    "level": 1,
+    "caption": "Fees",
+    "gist": null
+  },
+  {
+    "block": "b0021",
+    "ref": "3.1",
+    "level": 2,
+    "caption": "Payment",
+    "gist": "Customer shall pay the Fees within 30 days of invoice."
+  },
+  {
+    "block": "b0022",
+    "ref": "3.2",
+    "level": 2,
+    "caption": "Late Payment",
+    "gist": "Late amounts bear interest at 1% per month, provided that:"
+  },
+  {
+    "block": "b0023",
+    "ref": "3.2(a)",
+    "level": 3,
+    "caption": null,
+    "gist": "interest shall not exceed the maximum rate permitted by law; and"
+  },
+  {
+    "block": "b0024",
+    "ref": "3.2(b)",
+    "level": 3,
+    "caption": null,
+    "gist": "no interest accrues on amounts disputed under Section 3.3."
+  },
+  {
+    "block": "b0028",
+    "ref": "4",
+    "level": 1,
+    "caption": "Term",
+    "gist": null
+  },
+  {
+    "block": "b0029",
+    "ref": "4.1",
+    "level": 2,
+    "caption": null,
+    "gist": "This Agreement continues until terminated under Section 4.2."
+  },
+  {
+    "block": "b0030",
+    "ref": "4.2",
+    "level": 2,
+    "caption": null,
+    "gist": "Either party may terminate on 30 days' notice, in which case:"
+  },
+  {
+    "block": "b0031",
+    "ref": "4.2(a)",
+    "level": 3,
+    "caption": null,
+    "gist": "Customer pays for Services performed;"
+  },
+  {
+    "block": "b0032",
+    "ref": "4.2(b)",
+    "level": 3,
+    "caption": null,
+    "gist": "Provider returns Customer materials."
+  },
+  {
+    "block": "b0033",
+    "ref": null,
+    "level": 0,
+    "caption": "SCHEDULE 1",
+    "gist": null,
+    "kind": "heading"
+  }
+]
