@@ -83,6 +83,9 @@ class Block:
     # An alternative version of the clause before it at the same level (model
     # forms offer "[Alternative]" clauses): it takes that clause's number.
     alternative: bool = False
+    # The count runs on from the last clause at this level under an earlier
+    # parent instead of starting again at 1 (a Word list that isn't restarted).
+    continues: bool = False
     # How the clause's number is written, with its counters as slots:
     # "{1:decimal}.{2:decimal}.{n:decimal}" for "1.1.1", "Article {n:upperRoman}".
     # None = like the clause before it at the same level. Set on import so a
@@ -105,6 +108,8 @@ class Block:
             d["restart"] = True
         if self.alternative:
             d["alternative"] = True
+        if self.continues:
+            d["continues"] = True
         return d
 
     @classmethod
@@ -122,6 +127,7 @@ class Block:
             word=d.get("word"),
             restart=bool(d.get("restart", False)),
             alternative=bool(d.get("alternative", False)),
+            continues=bool(d.get("continues", False)),
             style=d.get("style"),
         )
 

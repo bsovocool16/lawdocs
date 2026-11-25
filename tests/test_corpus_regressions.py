@@ -208,3 +208,48 @@ def test_docs_read_back_keeps_structure(tmp_path):
     pulled = md_import.pull(render.to_markdown(doc), doc)
     shape = lambda d: [(b.kind, b.level, b.number, b.caption, b.text) for b in d.blocks]  # noqa: E731
     assert shape(pulled) == shape(doc)
+
+
+# A Word list that isn't restarted runs on under the next parent: "(5)" under
+# article 6 after "(1)"-"(4)" under article 5 (Charity Commission models).
+def test_list_running_on_under_the_next_parent(tmp_path):
+    numbering = _numbering(
+        '<w:abstractNum w:abstractNumId="1">' + _lvl(0, "decimal", "%1") + "</w:abstractNum>",
+        '<w:abstractNum w:abstractNumId="2">' + _lvl(0, "decimal", "(%1)") + "</w:abstractNum>",
+        nums='<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="2"/></w:num>')
+    src = write_docx(tmp_path / "run.docx", [
+        para({"text": "The charity may:", "num": (1, 0)}),
+        para({"text": "raise funds;", "num": (2, 0)}),
+        para({"text": "buy property;", "num": (2, 0)}),
+        para({"text": "The charity may also:", "num": (1, 0)}),
+        para({"text": "employ staff.", "num": (2, 0)}),
+    ], numbering=numbering)
+    doc = import_docx(src)
+    assert numbers(doc) == ["1", "(1)", "(2)", "2", "(3)"]
+    assert doc.clauses()[4].continues
+
+
+# "5A" inserted after "5" repeats its counter instead of taking the next one
+# (NVCA charter's Section 5A).
+def test_inserted_clause_with_a_letter_suffix(tmp_path):
+    numbering = _numbering(
+        '<w:abstractNum w:abstractNumId="1">' + _lvl(0, "decimal", "%1.") + "</w:abstractNum>",
+        '<w:abstractNum w:abstractNumId="2">' + _lvl(0, "decimal", "%1A.") + "</w:abstractNum>",
+        nums='<w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="2"/></w:num>')
+    src = write_docx(tmp_path / "5a.docx", [
+        para({"text": "Voting. Each share votes.", "num": (1, 0)}),
+        para({"text": "Protective Provisions. Consent is needed.", "num": (2, 0)}),
+        para({"text": "Redemption. Shares are not redeemable.", "num": (1, 0)}),
+    ], numbering=numbering)
+    doc = import_docx(src)
+    assert numbers(doc) == ["1.", "1A.", "2."]
+    assert doc.clauses()[1].alternative
+
+
+# Charter articles numbered in words ("FIRST:"), Word's ordinalText format.
+def test_ordinal_text_numbers():
+    assert [num.format_counter(n, "ordinalText") for n in (1, 2, 3, 4, 5, 12, 20, 21)] == [
+        "First", "Second", "Third", "Fourth", "Fifth", "Twelfth", "Twentieth", "Twenty-First"]
+    style = num.label_style("Fifth:", 1, "ordinalText")
+    assert num.render_style(style, [6] + [0] * 8, 1) == "Sixth:"
+    assert num.counter_value("Fifth:", "ordinalText") == 5

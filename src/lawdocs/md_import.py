@@ -96,7 +96,13 @@ def _note_runs(runs: list[Run], note_ns: set[int]) -> list[Run]:
 
 
 _SLOT_RX = {"decimal": r"[0-9]+", "decimalZero": r"[0-9]{2,}", "lowerLetter": r"[a-z]{1,3}",
-            "upperLetter": r"[A-Z]{1,3}", "lowerRoman": r"[ivxl]{1,8}", "upperRoman": r"[IVXL]{1,8}"}
+            "upperLetter": r"[A-Z]{1,3}", "lowerRoman": r"[ivxl]{1,8}", "upperRoman": r"[IVXL]{1,8}",
+            "ordinal": r"[0-9]+(?:st|nd|rd|th)"}
+for _fmt in ("ordinalText", "cardinalText"):
+    # Only the number words themselves ("Fifth", "Twenty-One"), longest first.
+    _SLOT_RX[_fmt] = "(?:" + "|".join(sorted((re.escape(num.format_counter(k, _fmt)) for k in range(1, 100)),
+                                              key=len, reverse=True)) + ")"
+_DISTINCT = {"decimal", "ordinal", "ordinalText", "cardinalText"}
 
 
 def _style_patterns(styles: list[str], allow_bare: bool = False) -> list[re.Pattern]:
@@ -108,7 +114,8 @@ def _style_patterns(styles: list[str], allow_bare: bool = False) -> list[re.Patt
     for st in sorted(set(styles), key=len, reverse=True):
         parts = [p for p in re.split(r"(\{(?:n|[1-9]):[A-Za-z]+\})", st) if p]
         literal = "".join(p for p in parts if not p.startswith("{") or p.startswith("{{"))
-        if not allow_bare and not literal.strip() and not all(p.endswith(":decimal}") for p in parts):
+        if (not allow_bare and not literal.strip()
+                and not all(re.fullmatch(r"\{(?:n|[1-9]):(%s)\}" % "|".join(_DISTINCT), p) for p in parts)):
             continue
         rx = ""
         for p in parts:
@@ -319,6 +326,7 @@ def _carry(old: Block, nb: Block, edited: str | None) -> None:
             nb.style = old.style
             nb.restart = old.restart
             nb.alternative = old.alternative
+            nb.continues = old.continues
     nb.id = old.id
     nb.word = old.word
     nb.source_number = old.source_number

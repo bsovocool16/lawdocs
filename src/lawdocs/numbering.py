@@ -89,7 +89,45 @@ def format_counter(n: int, fmt: str) -> str:
         return to_roman(n).upper()
     if fmt == "none":
         return ""
+    if fmt == "ordinalText":
+        return _ordinal_text(n)
+    if fmt == "cardinalText":
+        return _cardinal_text(n)
+    if fmt == "ordinal":
+        suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+        return f"{n}{suffix}"
     return str(n)
+
+
+_ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
+         "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
+_TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+_ORD = {"One": "First", "Two": "Second", "Three": "Third", "Five": "Fifth", "Eight": "Eighth", "Nine": "Ninth",
+        "Twelve": "Twelfth"}
+
+
+def _cardinal_text(n: int) -> str:
+    """Word's cardinalText: 21 -> "Twenty-One" (to 99; larger counters stay digits)."""
+    if n <= 0 or n >= 100:
+        return str(n)
+    if n < 20:
+        return _ONES[n]
+    return _TENS[n // 10] + ("-" + _ONES[n % 10] if n % 10 else "")
+
+
+def _ordinal_text(n: int) -> str:
+    """Word's ordinalText ("FIRST:" articles in a charter): 4 -> "Fourth", 21 -> "Twenty-First"."""
+    words = _cardinal_text(n)
+    if words.isdigit():
+        return words
+    head, _, last = words.rpartition("-")
+    if last in _ORD:
+        last = _ORD[last]
+    elif last.endswith("y"):
+        last = last[:-1] + "ieth"
+    else:
+        last += "th"
+    return (head + "-" if head else "") + last
 
 
 # --------------------------------------------------------------------------
@@ -168,6 +206,7 @@ def apply(doc: Document, scheme: Scheme = LEGAL) -> dict[str, str]:
     tolerated: the missing counter stays at 0 and is left out of citations.
     """
     counters = [0] * MAX_LEVEL
+    last = [0] * MAX_LEVEL  # each level's latest value, kept across parents
     styles: dict[int, str] = {}
     refs_at: dict[int, str] = {}
     refs: dict[str, str] = {}
@@ -178,8 +217,11 @@ def apply(doc: Document, scheme: Scheme = LEGAL) -> dict[str, str]:
         block.level = level
         if block.restart:
             counters[level - 1] = 0
+        elif block.continues:
+            counters[level - 1] = last[level - 1]
         if not (block.alternative and counters[level - 1]):
             counters[level - 1] += 1
+        last[level - 1] = counters[level - 1]
         for i in range(level, MAX_LEVEL):
             counters[i] = 0
         style = block.style or styles.get(level) or scheme.level(level).label
@@ -313,7 +355,8 @@ def renumber(blocks: list[Block], scheme: Scheme = LEGAL) -> Document:
 # --------------------------------------------------------------------------
 
 _COUNTER = re.compile(r"[0-9]+|[A-Za-z]+")
-_WORD_FMTS = {"decimal", "decimalZero", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman"}
+_WORD_FMTS = {"decimal", "decimalZero", "lowerLetter", "upperLetter", "lowerRoman", "upperRoman",
+              "ordinalText", "cardinalText", "ordinal"}
 
 
 def _token_fmt(tok: str, roman: bool) -> str | None:
@@ -357,6 +400,13 @@ def label_style(label: str, level: int, fmt: str | None = None) -> str | None:
     punctuation stay as they are ("Article {n:upperRoman}", "5A.{2:decimal}.{n:decimal}").
     """
     label = label.strip().lstrip("[").replace(" ", " ")
+    if fmt in ("ordinalText", "cardinalText", "ordinal"):
+        # "Fifth:", "Twenty-One", "3rd": the number is a word (or carries a suffix).
+        m = re.search(r"[0-9]+(?:st|nd|rd|th)|[A-Za-z]+(?:-[A-Za-z]+)?", label)
+        if not m:
+            return None
+        lit = lambda t: t.replace("{", "{{").replace("}", "}}")  # noqa: E731
+        return lit(label[:m.start()]) + "{n:%s}" % fmt + lit(label[m.end():])
     toks = _counters_in(label)
     if not toks:
         return None
@@ -383,6 +433,12 @@ def label_style(label: str, level: int, fmt: str | None = None) -> str | None:
 def counter_value(label: str, fmt: str | None = None) -> int | None:
     """The clause's own counter in a source label: "2.3.1" -> 1, "(c)" -> 3, "(iv)" -> 4."""
     label = label.strip().lstrip("[")
+    if fmt in ("ordinalText", "cardinalText", "ordinal"):
+        m = re.search(r"([0-9]+)(?:st|nd|rd|th)|[A-Za-z]+(?:-[A-Za-z]+)?", label)
+        if m and m.group(1):
+            return int(m.group(1))
+        word = m.group(0).lower() if m else ""
+        return next((k for k in range(1, 100) if format_counter(k, fmt).lower() == word), None)
     toks = _counters_in(label)
     if not toks:
         return None
@@ -479,11 +535,15 @@ def mark_restarts(doc: Document) -> int:
 
     * ``restart``: the number starts its level again ("1." after "4.").
     * ``alternative``: the number repeats the clause before it at that level
-      (a model form's "[Alternative] 4.4.4" after 4.4.4), so it doesn't count.
+      (a model form's "[Alternative] 4.4.4" after 4.4.4, or "5A" inserted
+      after "5"), so it doesn't count.
+    * ``continues``: the count runs on from the last clause at that level
+      under an earlier parent, as a Word list does unless restarted.
     """
     apply(doc)
     n = 0
     counters = [0] * MAX_LEVEL
+    last = [0] * MAX_LEVEL
     last_label: dict[int, str] = {}
     for b in doc.blocks:
         if b.kind != "clause":
@@ -493,18 +553,29 @@ def mark_restarts(doc: Document) -> int:
         own = re.search(r"\{n:([A-Za-z]+)\}", b.style or "")
         value = counter_value(b.source_number, own.group(1) if own else None) if b.source_number else None
         label = " ".join((b.source_number or "").replace("[", "").split()).rstrip(".")
-        if value is not None and not (b.restart or b.alternative) and computed != 1:
-            if label and last_label.get(lv) == label and value == computed - 1:
+        flagged = b.restart or b.alternative or b.continues
+        if value is not None and not flagged and computed != 1:
+            # Repeats the number before it: an alternative version ("[Alternative]
+            # 4.4.4") or an inserted clause ("5A" after "5").
+            if lv in last_label and value == computed - 1:
                 b.alternative = True
                 n += 1
             elif value == 1:
                 b.restart = True
                 n += 1
+        elif value is not None and not flagged and computed == 1 and value > 1 and value == last[lv - 1] + 1:
+            # A Word list that runs on under the next parent: "(5)" under
+            # article 6 after "(1)"-"(4)" under article 5.
+            b.continues = True
+            n += 1
         if b.restart:
             computed = 1
         elif b.alternative:
             computed = max(1, counters[lv - 1])
+        elif b.continues:
+            computed = last[lv - 1] + 1
         counters[lv - 1] = computed
+        last[lv - 1] = computed
         last_label[lv] = label
         for i in range(lv, MAX_LEVEL):
             counters[i] = 0

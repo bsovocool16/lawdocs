@@ -200,7 +200,10 @@ def verdict(r: dict) -> str:
         return "FAIL"
     if not r.get("docs_refs_match") or not r.get("docs_text_match"):
         return "FAIL"
-    if r.get("numbers_changed") or (r.get("office_numbers") or {}).get("differ"):
+    office = r.get("office_numbers") or {}
+    # LibreOffice's reading is independent of lawdocs', so it decides when it
+    # found clauses to compare; lawdocs' own reading of Word's lists otherwise.
+    if office.get("differ") or (not office.get("compared") and r.get("numbers_changed")):
         return "NUMBERS"
     if pages.get("differing_pages") or pages.get("pages_source") != pages.get("pages_export") and "skipped" not in pages:
         # Rebuilt paragraphs (typed numbers turned into Word numbering) and
@@ -219,7 +222,7 @@ def report_md(results: list[dict]) -> str:
         counts[verdict(r)] = counts.get(verdict(r), 0) + 1
     lines.append(", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) + f" (of {len(results)})")
     lines += ["", "PASS: identical text, structure and pages. NUMBERS: some clause numbers in Claude Docs differ from the "
-              "numbers Word showed. CHECK: round trip fine but the structure may be "
+              "numbers the source shows (as LibreOffice renders it). CHECK: round trip fine but the structure may be "
               "misread. NORMALISED: pages differ because lawdocs fixed something (typed numbers, tracked changes). "
               "LAYOUT: pages differ for no intended reason. FAIL: error or text/structure lost.", "",
               "| File | Verdict | Clauses | Kept / rebuilt | Pages differing | Notes |", "| --- | --- | --- | --- | --- | --- |"]
