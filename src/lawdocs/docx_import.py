@@ -30,7 +30,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from . import numbering as num
-from .model import Block, Document, Run, note_marker
+from .model import Block, Document, Run, note_marker, signature  # noqa: F401 (signature re-exported)
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 NS = {"w": W}
@@ -111,6 +111,13 @@ def _heading_level(styles: dict[str, Style], sid: str | None) -> int | None:
     return None
 
 
+def _is_toc_style(styles: dict[str, Style], sid: str | None) -> bool:
+    """A table-of-contents entry ("TOC 1", "toc 2"): it repeats headings with
+    their numbers typed in, and must not be read as clauses."""
+    return any(re.fullmatch(r"toc\s*[1-9]|table of contents|toc heading", st.name.strip(), re.I)
+               or re.fullmatch(r"TOC[1-9]", st.id) for st in _style_chain(styles, sid))
+
+
 def _is_title_style(styles: dict[str, Style], sid: str | None) -> bool:
     return any(st.name.strip().lower() == "title" for st in _style_chain(styles, sid))
 
@@ -137,6 +144,7 @@ class Numbering:
     # Running counters per abstractNum; None = level not used since last reset.
     _counters: dict[str, list[int | None]] = field(default_factory=dict)
     _seen_nums: set[str] = field(default_factory=set)
+    _starts: dict[str, dict[int, int]] = field(default_factory=dict)  # abstractNumId -> active start overrides
 
     def lvl(self, num_id: str, ilvl: int) -> Lvl | None:
         aid = self.nums.get(num_id)
@@ -158,27 +166,38 @@ class Numbering:
             return None
         levels = self.abstract[aid]
         counters = self._counters.setdefault(aid, [None] * 9)
+        starts = self._starts.setdefault(aid, {})
         if num_id not in self._seen_nums:
             self._seen_nums.add(num_id)
             ov = self.overrides.get(num_id)
             if ov:
+                # A list instance with start overrides begins afresh: each level
+                # counts from its override, and a level shown but not yet used
+                # in this instance ("%1" in "%1.%2") shows its start value.
                 for i in range(9):
                     counters[i] = None
-                for il, start in ov.items():
-                    counters[il] = start - 1
+                starts.clear()
+                starts.update(ov)
+
+        def start(k: int) -> int:
+            return starts.get(k, levels.get(k, Lvl()).start)
+
         lv = levels.get(ilvl, Lvl())
         if counters[ilvl] is None:
-            counters[ilvl] = lv.start - 1
+            counters[ilvl] = start(ilvl) - 1
         counters[ilvl] += 1
         for i in range(ilvl + 1, 9):
             counters[i] = None
+            starts.pop(i, None)  # restarted by its parent: back to its own start
         if lv.fmt == "bullet":
             return "•"
 
         def sub(m: re.Match) -> str:
             k = int(m.group(1)) - 1
             klv = levels.get(k, Lvl())
-            val = counters[k] if counters[k] is not None else klv.start
+            if counters[k] is None:
+                counters[k] = start(k)  # shown, so it now counts from there
+            val = counters[k]
             fmt = "decimal" if (lv.is_lgl and klv.fmt != "none") else klv.fmt
             return num.format_counter(val, fmt)
 
@@ -386,24 +405,33 @@ def _read_footnotes(root: ET.Element | None) -> tuple[dict[str, str], dict[str, 
 
 _NS_DECL = re.compile(r'\sxmlns:([A-Za-z0-9]+)="([^"]*)"')
 _KNOWN_NS: dict[str, str] = {}
+# Prefixes declared on the root element of the part being read. Only these can
+# be left off a saved fragment: a prefix declared further down (pictures declare
+# a:, pic:, a14: on the drawing itself) must stay on the fragment.
+_ROOT_NS: dict[str, str] = {}
 
 
-def register_namespaces(xml: bytes) -> None:
-    """Make ElementTree write the source package's own prefixes (w:, w14:, ...)."""
-    head = xml[:20000].decode("utf8", "replace")
-    for prefix, uri in _NS_DECL.findall(head):
-        if prefix not in ("xml",) and _KNOWN_NS.get(prefix) != uri:
+def register_namespaces(xml: bytes) -> dict[str, str]:
+    """Make ElementTree write the source package's own prefixes (w:, w14:, ...).
+    Returns the prefixes the part's root element declares."""
+    text = xml.decode("utf8", "replace")
+    root = re.search(r"<(?![?!])[^>]*>", text)
+    root_ns = dict(_NS_DECL.findall(root.group(0))) if root else {}
+    # Root declarations last, so they win if a prefix is rebound further down.
+    for prefix, uri in _NS_DECL.findall(text) + list(root_ns.items()):
+        if prefix != "xml" and _KNOWN_NS.get(prefix) != uri:
             try:
                 ET.register_namespace(prefix, uri)
                 _KNOWN_NS[prefix] = uri
             except ValueError:
                 pass
+    return root_ns
 
 
 def xml_str(el: ET.Element) -> str:
-    """Serialise an element without the namespace declarations the package root already makes."""
+    """Serialise an element without the namespace declarations the part's root already makes."""
     s = ET.tostring(el, encoding="unicode")
-    return _NS_DECL.sub(lambda m: "" if _KNOWN_NS.get(m.group(1)) == m.group(2) else m.group(0), s)
+    return _NS_DECL.sub(lambda m: "" if _ROOT_NS.get(m.group(1)) == m.group(2) else m.group(0), s)
 
 
 _TRACKED = {q("ins"), q("del"), q("moveFrom"), q("moveTo")}
@@ -417,13 +445,6 @@ def _raw_content(p: ET.Element) -> str | None:
     return "".join(xml_str(c) for c in p if c.tag != q("pPr"))
 
 
-def signature(kind: str, level: int, caption: str | None, runs) -> str:
-    """What a block says, ignoring run splits and spacing, so an untouched
-    paragraph is recognised after a trip through Claude Docs."""
-    text = " ".join("".join(r.text for r in runs).split())
-    return f"{kind}|{level}|{' '.join((caption or '').split())}|{text}"
-
-
 class _Importer:
     def __init__(self, styles: dict[str, Style], numbering: Numbering, source: str):
         self.styles = styles
@@ -434,6 +455,7 @@ class _Importer:
         self.current_level = 0
         self.prev_alpha_lower: str | None = None
         self.prev_alpha_upper: str | None = None
+        self.levels = num.LevelReader()
         self.typed_numbers = 0
         self.bullets = 0
         self.style_separators = 0
@@ -502,11 +524,10 @@ class _Importer:
         elif level == 5 and tok.isupper():
             self.prev_alpha_upper = tok
 
-    def _clause(self, label: str, fallback_level: int, runs: list[Run], heading: bool) -> None:
-        level = num.classify_label(label, self.prev_alpha_lower, self.prev_alpha_upper) or fallback_level
-        self._track_alpha(label, level)
-        if level <= 1:
-            self.prev_alpha_lower = self.prev_alpha_upper = None
+    def _clause(self, label: str, fallback_level: int, runs: list[Run], heading: bool,
+                fmt: str | None = None) -> None:
+        level = self.levels.read(label, fallback_level, fmt) or fallback_level
+        self.prev_alpha_lower, self.prev_alpha_upper = self.levels.prev_lower, self.levels.prev_upper
         caption, body = _split_caption(runs, level)
         text = "".join(r.text for r in runs).strip()
         if (heading and caption is None and level <= 2 and not any(r.note for r in runs)
@@ -518,7 +539,9 @@ class _Importer:
             core = caption.lstrip("[")
             after = re.sub(r"^\s*\[\d+\]", "", text[text.find(core) + len(core):]).lstrip()
             self._word["caption"] = {"form": form, "punct": after[:1] if after[:1] in (".", ":") else ""}
-        self._add("clause", level, body, source_number=label, caption=caption)
+        b = self._add("clause", level, body, source_number=label, caption=caption)
+        b.style = num.label_style(label, level, fmt)
+        b.word["source_fmt"] = fmt
         self.current_level = level
 
     def footnote(self, fid: str | None) -> str | None:
@@ -567,6 +590,11 @@ class _Importer:
             return
 
         heading_lvl = _heading_level(self.styles, style_id)
+        if _is_toc_style(self.styles, style_id) and re.search(r"\s[0-9ivxlc]{1,5}\s*$", text):
+            # Drafters do use TOC styles for body text, so only a line that ends
+            # in a page number counts as a contents entry.
+            self._add("text", 0, runs)
+            return
 
         if label == "•":
             self.bullets += 1
@@ -574,7 +602,9 @@ class _Importer:
             self._add("text", self.current_level, [Run("\u2022 ")] + runs)
             return
         if label:
-            self._clause(label, ilvl + 1, runs, heading=heading_lvl is not None)
+            lvl_def = self.numbering.lvl(num_id, ilvl)
+            self._clause(label, ilvl + 1, runs, heading=heading_lvl is not None,
+                         fmt=lvl_def.fmt if lvl_def else None)
             return
 
         typed = num.split_typed_number(text)
@@ -585,6 +615,10 @@ class _Importer:
             if level is not None and (level <= 2 or self.current_level > 0):
                 self.typed_numbers += 1
                 prefix_len = len(text) - len(rest)
+                # Kept so an untouched paragraph goes back as typed, and a new
+                # clause in a typed document is typed the same way.
+                lead = text[:prefix_len]
+                self._word["typed"] = {"label": t_label, "sep": lead[lead.index(t_label) + len(t_label):] or " "}
                 self._clause(t_label, level, _strip_prefix(runs, prefix_len), heading=heading_lvl is not None)
                 return
 
@@ -601,6 +635,7 @@ class _Importer:
         if heading_lvl is not None or (_is_caps_heading(text) and len(text) > 2):
             self._add("heading", 0, runs)
             self.current_level = 0
+            self.levels.reset()
             return
         self._add("text", self.current_level if has_clause else 0, runs)
 
@@ -622,6 +657,10 @@ class _Importer:
         if any(any(c for c in r) for r in rows):
             self._word = {"tbl": xml_str(tbl), "rows": rows}
             self._add("table", self.current_level, [], rows=rows)
+        else:
+            # An empty table (a box to fill in): nothing for Claude Docs, but it
+            # goes back to Word where it was, like an empty paragraph.
+            self._spacer(tbl)
         if numbered:
             self.warnings.append("A table contains numbered paragraphs; their numbers were not imported.")
 
@@ -658,19 +697,23 @@ def import_docx(path: str | Path) -> Document:
             raw_doc = z.read("word/document.xml")
         except KeyError:
             raise ValueError(f"{path} has no word/document.xml; is it a .docx?") from None
-        register_namespaces(raw_doc)
+        doc_ns = register_namespaces(raw_doc)
         document = ET.fromstring(raw_doc)
         styles = _read_styles(_load(z, "word/styles.xml"))
         numbering = _read_numbering(_load(z, "word/numbering.xml"))
         try:
             raw_fn = z.read("word/footnotes.xml")
-            register_namespaces(raw_fn)
+            fn_ns = register_namespaces(raw_fn)
             footnotes = ET.fromstring(raw_fn)
         except KeyError:
-            footnotes = None
+            footnotes, fn_ns = None, {}
 
     imp = _Importer(styles, numbering, path.name)
+    _ROOT_NS.clear()
+    _ROOT_NS.update(fn_ns)
     imp.footnote_texts, imp.footnote_xml = _read_footnotes(footnotes)
+    _ROOT_NS.clear()
+    _ROOT_NS.update(doc_ns)
     body = document.find("w:body", NS)
     if body is not None:
         imp.body(body)
@@ -697,5 +740,6 @@ def import_docx(path: str | Path) -> Document:
 
     doc = Document(blocks=imp.blocks, source=path.name, warnings=warnings, notes=imp.notes,
                    template={"front": imp.front})
-    num.apply(doc)
+    num.mark_restarts(doc)
+    num.keep_typed_quirks(doc)
     return doc

@@ -31,16 +31,22 @@ def test_round_trip_keeps_structure_and_text(src, tmp_path):
     assert texts(again) == texts(doc)
 
 
-def test_typed_numbers_become_word_numbering(src, tmp_path):
+def test_typed_numbers_stay_typed_and_follow_edits(src, tmp_path):
     doc = import_docx(src)
     out = export_docx(doc, src, tmp_path / "out.docx")
     xml = zipfile.ZipFile(out).read("word/document.xml").decode()
-    # Section 3 was typed by hand in the source; on export Word numbers it.
-    assert ">3.1 " not in xml and ">(a) interest" not in xml
-    assert 'w:numId w:val="990"' in xml
-    assert "abstractNumId=\"990\"" in zipfile.ZipFile(out).read("word/numbering.xml").decode()
+    # Section 3 was typed by hand in the source: untouched, it goes back as it was.
+    assert ">3.1 Payment. Customer shall pay" in xml and ">(a) interest" in xml
+    assert 'w:numId w:val="990"' not in xml
+    # Delete 3.1: the typed numbers after it are rewritten, still as text.
+    doc.blocks = [b for b in doc.blocks if not b.text.startswith("Customer shall pay")]
+    out = export_docx(doc, src, tmp_path / "edited.docx")
+    xml = zipfile.ZipFile(out).read("word/document.xml").decode()
+    assert ">3.2 " not in xml and ">3.1 " in xml
     again = import_docx(out)
-    assert not any("hand-typed" in w for w in again.warnings)
+    late = next(b for b in again.clauses() if b.text.startswith("Late amounts"))
+    assert late.number == "3.1" and late.source_number == "3.1"
+    assert [c.number for c in again.clauses() if c.text.startswith(("interest shall", "no interest"))] == ["(a)", "(b)"]
 
 
 def test_edits_renumber_and_take_house_style(src, tmp_path):

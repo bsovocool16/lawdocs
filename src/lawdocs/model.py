@@ -9,7 +9,8 @@ so it can never drift out of sync the way Word's direct formatting does.
 Kinds
 -----
 ``title``    the document title (at most one, at the top)
-``clause``   a numbered provision; ``level`` 1..6 maps to 1 / 1.1 / (a) / (i) / (A) / (1)
+``clause``   a numbered provision; ``level`` 1..9. By default 1 / 1.1 / (a) / (i) / (A) / (1);
+             a document imported from Word keeps its own scheme (e.g. 1 / 1.1 / 1.1.1 / (a))
 ``text``     an unnumbered paragraph; ``level`` is the level of the clause it continues
              (0 = not inside any clause, e.g. recitals or a preamble)
 ``heading``  an unnumbered heading (e.g. "RECITALS", "Schedule 1")
@@ -25,7 +26,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 KINDS = ("title", "clause", "text", "heading", "table")
-MAX_LEVEL = 6
+MAX_LEVEL = 9
 
 
 @dataclass
@@ -76,6 +77,20 @@ class Block:
     # raw table XML. Never shown in Claude Docs; used only by docx_export to
     # rebuild the paragraph exactly as the template formats it.
     word: dict[str, Any] | None = None
+    # The clause starts its level's count again at 1 (a schedule or part with
+    # its own numbering). Structural, so it survives edits around it.
+    restart: bool = False
+    # An alternative version of the clause before it at the same level (model
+    # forms offer "[Alternative]" clauses): it takes that clause's number.
+    alternative: bool = False
+    # The count runs on from the last clause at this level under an earlier
+    # parent instead of starting again at 1 (a Word list that isn't restarted).
+    continues: bool = False
+    # How the clause's number is written, with its counters as slots:
+    # "{1:decimal}.{2:decimal}.{n:decimal}" for "1.1.1", "Article {n:upperRoman}".
+    # None = like the clause before it at the same level. Set on import so a
+    # Word document keeps its own forms; the counters are always recomputed.
+    style: str | None = None
 
     @property
     def text(self) -> str:
@@ -85,10 +100,16 @@ class Block:
         d: dict[str, Any] = {"id": self.id, "kind": self.kind, "level": self.level}
         if self.runs:
             d["runs"] = [r.to_dict() for r in self.runs]
-        for key in ("number", "source_number", "caption", "rows", "author", "word"):
+        for key in ("number", "source_number", "style", "caption", "rows", "author", "word"):
             val = getattr(self, key)
             if val is not None:
                 d[key] = val
+        if self.restart:
+            d["restart"] = True
+        if self.alternative:
+            d["alternative"] = True
+        if self.continues:
+            d["continues"] = True
         return d
 
     @classmethod
@@ -104,6 +125,10 @@ class Block:
             rows=d.get("rows"),
             author=d.get("author"),
             word=d.get("word"),
+            restart=bool(d.get("restart", False)),
+            alternative=bool(d.get("alternative", False)),
+            continues=bool(d.get("continues", False)),
+            style=d.get("style"),
         )
 
 
@@ -163,3 +188,10 @@ def note_number(marker: str) -> int | None:
 
 
 __all__ = ["Block", "Document", "Run", "KINDS", "MAX_LEVEL", "asdict", "note_marker", "note_number"]
+
+
+def signature(kind: str, level: int, caption: str | None, runs) -> str:
+    """What a block says, ignoring run splits and spacing, so an untouched
+    paragraph is recognised after a trip through Claude Docs."""
+    text = " ".join("".join(r.text for r in runs).split())
+    return f"{kind}|{level}|{' '.join((caption or '').split())}|{text}"

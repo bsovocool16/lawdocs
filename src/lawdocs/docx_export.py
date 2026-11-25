@@ -115,6 +115,10 @@ def _with_numbering(ppr: str | None, level: int) -> str:
     return ppr
 
 
+def _norm(label: str | None) -> str:
+    return (label or "").replace("\u00a0", " ").strip().lstrip("[").rstrip(".:")
+
+
 def _table_text(rows: list[list[str]] | None) -> list[list[str]]:
     """Cell text without blank rows (Claude Docs drops empty rows, such as the
     blank line a schedule leaves for filling in) or spacing differences."""
@@ -154,6 +158,8 @@ class _Writer:
         self.next_bookmark = 900000
         self.verbatim = self.rebuilt = 0
         self.profile = self._learn_profile()
+        self.index = {id(b): i for i, b in enumerate(doc.blocks)}
+        self.typed: dict | None = None
 
     # The template's house style for each kind and level, learned from the
     # blocks that were imported from it.
@@ -189,18 +195,59 @@ class _Writer:
 
     # ------------------------------------------------------------------
 
+    def _sibling(self, b: Block) -> dict | None:
+        """Word data of the nearest imported clause beside ``b`` at its level and
+        under the same parent (the one before it, else the one after it). A
+        clause added or moved there is numbered the way that sibling is: in its
+        Word list, so Word counts them together, or typed like it."""
+        if b.kind != "clause":
+            return None
+        blocks = self.doc.blocks
+        i = self.index.get(id(b))
+        if i is None:
+            return None
+        for step in (-1, 1):
+            j = i + step
+            while 0 <= j < len(blocks):
+                o = blocks[j]
+                if (o.kind == "clause" and o.level < b.level) or o.kind in ("heading", "title"):
+                    break
+                if step == 1 and o.kind == "clause" and o.level == b.level and o.restart:
+                    break
+                ow = o.word or {}
+                if (o is not b and o.kind == "clause" and o.level == b.level and ow.get("kind") == "clause"
+                        and ow.get("level") == b.level and not ow.get("label_only")):
+                    return ow
+                j += step
+        return None
+
     def _ppr_for(self, b: Block) -> str | None:
+        """Paragraph properties for ``b``; sets ``self.typed`` when its number
+        is to be written as text, as the source typed it."""
         w = b.word or {}
-        if w.get("kind") == b.kind and w.get("level") == b.level and "pPr" in w:
+        self.typed = None
+        same = w.get("kind") == b.kind and w.get("level") == b.level
+        if same and "pPr" in w:
             ppr = w["pPr"]
-        elif w.get("kind") == b.kind and w.get("level") == b.level:
+        elif same:
             ppr = None
         else:
-            ppr = self.profile["ppr"].get((b.kind, b.level)) or None
-        if b.kind == "clause" and not _ppr_is_numbered(ppr, self.tpl):
-            self.needs_fallback = True
-            ppr = _with_numbering(ppr, b.level)
-        return ppr
+            sib = self._sibling(b)
+            ppr = (sib.get("pPr") if sib else None) or self.profile["ppr"].get((b.kind, b.level)) or None
+        if b.kind != "clause" or _ppr_is_numbered(ppr, self.tpl):
+            return ppr
+        if same and w.get("typed"):
+            self.typed = w["typed"]  # typed in the source: stays typed
+            return ppr
+        sib = self._sibling(b)
+        if sib and _ppr_is_numbered(sib.get("pPr"), self.tpl):
+            return sib["pPr"]  # join the siblings' Word list
+        typed = (sib or {}).get("typed")
+        if typed:
+            self.typed = typed
+            return ppr
+        self.needs_fallback = True
+        return _with_numbering(ppr, b.level)
 
     def _caption_form(self, b: Block) -> tuple[str, str, str | None]:
         w = b.word or {}
@@ -224,6 +271,8 @@ class _Writer:
             return None
         if (ppr or None) != (w.get("pPr") or None):
             return None  # numbering had to be added: rebuild
+        if w.get("typed") and _norm(w["typed"]["label"]) != _norm(b.number):
+            return None  # the typed number is out of date
 
         ok = True
 
@@ -259,15 +308,18 @@ class _Writer:
         self.rebuilt += 1
         if w.get("bullet") and w.get("kind") == b.kind and w.get("level") == b.level and b.runs:
             b = Block(b.id, b.kind, b.level, [Run(b.runs[0].text.lstrip("\u2022 "), b.runs[0].bold, b.runs[0].italic)] + b.runs[1:])
+        number = ""
+        if self.typed and b.kind == "clause":
+            number = self._run(Run((b.number or "") + self.typed["sep"]))
         if b.kind != "clause" or not b.caption:
             # Without a caption there is no second paragraph to run into, so the
             # paragraph mark must not stay hidden.
-            return f"<w:p>{_unhide_mark(ppr)}{self._runs(b.runs)}</w:p>"
+            return f"<w:p>{_unhide_mark(ppr)}{number}{self._runs(b.runs)}</w:p>"
         form, punct, sep_ppr = self._caption_form(b)
         cap = b.caption
         bracket = cap.startswith("[")
         core = Run(cap.lstrip("["), bold=(form == "b"))
-        head = (self._run(Run("[")) if bracket else "") + self._run(core, underline=(form == "u"))
+        head = number + (self._run(Run("[")) if bracket else "") + self._run(core, underline=(form == "u"))
         head += self._run(Run(punct)) if punct else ""
         body = self._runs(b.runs)
         space = self._run(Run(" ")) if b.runs and not b.runs[0].text.startswith(" ") and not b.runs[0].note else ""

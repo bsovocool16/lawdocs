@@ -113,7 +113,10 @@ def footnote_ref(fid: int) -> str:
     return f'<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="{fid}"/></w:r>'
 
 
-def write_docx(path: str | Path, body: list[str], footnotes: dict[int, str] | None = None) -> Path:
+def write_docx(path: str | Path, body: list[str], footnotes: dict[int, str] | None = None,
+               numbering: str | None = None, styles: str | None = None) -> Path:
+    """``numbering``/``styles`` replace the default parts (pass whole XML);
+    ``styles`` may also be extra <w:style> elements to add to the defaults."""
     path = Path(path)
     doc = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="{W}"><w:body>{"".join(body)}{SECT}</w:body></w:document>'
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -132,8 +135,10 @@ def write_docx(path: str | Path, body: list[str], footnotes: dict[int, str] | No
         z.writestr("_rels/.rels", RELS)
         z.writestr("word/_rels/document.xml.rels", rels)
         z.writestr("word/document.xml", doc)
-        z.writestr("word/styles.xml", STYLES)
-        z.writestr("word/numbering.xml", NUMBERING)
+        if styles and not styles.lstrip().startswith("<?xml"):
+            styles = STYLES.replace("</w:styles>", styles + "</w:styles>")
+        z.writestr("word/styles.xml", styles or STYLES)
+        z.writestr("word/numbering.xml", numbering or NUMBERING)
     return path
 
 
