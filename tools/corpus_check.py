@@ -30,7 +30,8 @@ import tempfile
 import traceback
 from pathlib import Path
 
-from lawdocs import outline
+from lawdocs import md_import, outline
+from lawdocs import render as md_render
 from lawdocs.docx_export import export_docx
 from lawdocs.docx_import import import_docx
 from lawdocs.numbering import split_typed_number
@@ -44,6 +45,61 @@ def _refs(doc):
 
 def _texts(doc):
     return [(b.kind, " ".join((b.caption or "").split()), " ".join(b.text.split())) for b in doc.blocks]
+
+
+def _norm_number(s: str | None) -> str:
+    s = (s or "").replace("\u00a0", " ").strip().lstrip("[").strip()
+    return re.sub(r"\s+", " ", s).rstrip(".:")
+
+
+def _number_changes(doc) -> list[str]:
+    """Clauses whose number in Claude Docs differs from the number Word showed."""
+    return [f"{b.source_number} -> {b.number}" for b in doc.clauses()
+            if b.source_number and _norm_number(b.source_number) != _norm_number(b.number)]
+
+
+_LABELISH = re.compile(r"(?:(?:Article|Section|Clause|Schedule|Part|ARTICLE|SECTION)\s+)?"
+                       r"(?:[0-9]+(?:\.[0-9]+)*\.?|\(?[0-9]{1,3}\)|\(?[a-zA-Z]{1,3}[.)]|\([ivxIVX]{1,8}\)|[IVX]{1,6}\.?)[.:]?")
+
+
+def _office_labels(docx: Path, doc, work: Path) -> dict | None:
+    """Compare each clause's number with the number LibreOffice shows for it.
+
+    LibreOffice's text export writes list numbers into the text, so it is an
+    independent reading of Word's numbering (lawdocs' own reading could share
+    a mistake with the check above). Clauses are found by their opening words,
+    in order."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        return None
+    src = work / ("txt-" + docx.name)
+    shutil.copyfile(docx, src)
+    subprocess.run([soffice, "--headless", "--convert-to", "txt:Text (encoded):UTF8", "--outdir", str(work), str(src)],
+                   capture_output=True, timeout=600)
+    txt = work / (src.stem + ".txt")
+    if not txt.exists():
+        return None
+    lines = [" ".join(ln.replace("\u00a0", " ").split()) for ln in txt.read_text(encoding="utf-8-sig").splitlines()]
+    pos, found, differ = 0, 0, []
+    for b in doc.clauses():
+        words = " ".join(re.split(r"[\u00b9\u00b2\u00b3\u2070-\u2079]", ((b.caption or "") + " " + b.text).strip())[0].split())
+        words = words.lstrip("[“\"")[:40]
+        if len(words) < 12:
+            continue
+        for i in range(pos, min(pos + 400, len(lines))):
+            k = lines[i].find(words)
+            if 0 < k <= 30:
+                label = lines[i][:k].strip().rstrip("[“\"‘'(- ").strip()
+                if _LABELISH.fullmatch(label):
+                    found += 1
+                    if _norm_number(label) != _norm_number(b.number):
+                        differ.append(f"{label} -> {b.number}")
+                pos = i + 1
+                break
+            if k == 0:
+                pos = i + 1
+                break
+    return {"compared": found, "differ": differ}
 
 
 def _render(docx: Path, out_dir: Path) -> Path | None:
@@ -93,7 +149,17 @@ def check(path: Path, out: Path, render: bool) -> dict:
         b.text[:80] for b in doc.blocks
         if b.kind == "text" and (_LOOKS_NUMBERED.match(b.text) or split_typed_number(b.text))
     ][:20]
-    r["level_histogram"] = {str(lv): sum(1 for c in clauses if c.level == lv) for lv in range(1, 7)}
+    r["level_histogram"] = {str(lv): sum(1 for c in clauses if c.level == lv) for lv in range(1, 10)}
+    r["numbers_changed"] = _number_changes(doc)
+    # The Claude Docs leg: render to Markdown and read it straight back.
+    try:
+        pulled = md_import.pull(md_render.to_markdown(doc), doc)
+        r["docs_refs_match"] = _refs(pulled) == _refs(doc)
+        r["docs_text_match"] = _texts(pulled) == _texts(doc)
+    except Exception as e:  # noqa: BLE001
+        r["error"] = f"Markdown pull failed: {e}"
+        r["trace"] = traceback.format_exc()
+        return r
 
     work = Path(tempfile.mkdtemp(prefix="lawdocs-"))
     try:
@@ -115,6 +181,7 @@ def check(path: Path, out: Path, render: bool) -> dict:
             r["error"] = f"re-import of export failed: {e}"
             return r
         if render:
+            r["office_numbers"] = _office_labels(path, doc, work)
             src_copy = work / ("source-" + path.name)
             shutil.copyfile(path, src_copy)
             a = _render(src_copy, work)
@@ -131,6 +198,10 @@ def verdict(r: dict) -> str:
     pages = r.get("pages") or {}
     if not r.get("refs_match") or not r.get("text_match"):
         return "FAIL"
+    if not r.get("docs_refs_match") or not r.get("docs_text_match"):
+        return "FAIL"
+    if r.get("numbers_changed") or (r.get("office_numbers") or {}).get("differ"):
+        return "NUMBERS"
     if pages.get("differing_pages") or pages.get("pages_source") != pages.get("pages_export") and "skipped" not in pages:
         # Rebuilt paragraphs (typed numbers turned into Word numbering) and
         # accepted tracked changes are meant to change the page.
@@ -147,7 +218,8 @@ def report_md(results: list[dict]) -> str:
     for r in results:
         counts[verdict(r)] = counts.get(verdict(r), 0) + 1
     lines.append(", ".join(f"{k}: {v}" for k, v in sorted(counts.items())) + f" (of {len(results)})")
-    lines += ["", "PASS: identical text, structure and pages. CHECK: round trip fine but the structure may be "
+    lines += ["", "PASS: identical text, structure and pages. NUMBERS: some clause numbers in Claude Docs differ from the "
+              "numbers Word showed. CHECK: round trip fine but the structure may be "
               "misread. NORMALISED: pages differ because lawdocs fixed something (typed numbers, tracked changes). "
               "LAYOUT: pages differ for no intended reason. FAIL: error or text/structure lost.", "",
               "| File | Verdict | Clauses | Kept / rebuilt | Pages differing | Notes |", "| --- | --- | --- | --- | --- | --- |"]
@@ -157,7 +229,11 @@ def report_md(results: list[dict]) -> str:
                                       + (f" (export has {pages.get('pages_export')})"
                                          if pages.get("pages_export") != pages.get("pages_source") else ""))
         notes = r.get("error") or "; ".join(
-            x for x in [f"{len(r['skipped_levels'])} skipped levels" if r.get("skipped_levels") else "",
+            x for x in [f"{len(r['numbers_changed'])} numbers differ" if r.get("numbers_changed") else "",
+                        f"{len(r['office_numbers']['differ'])} of {r['office_numbers']['compared']} numbers differ from LibreOffice"
+                        if (r.get("office_numbers") or {}).get("differ") else "",
+                        "Markdown pull changes structure" if not (r.get("docs_refs_match") and r.get("docs_text_match")) else "",
+                        f"{len(r['skipped_levels'])} skipped levels" if r.get("skipped_levels") else "",
                         f"{len(r['plain_but_numbered'])} numbered-looking plain paragraphs" if r.get("plain_but_numbered") else ""]
             if x)
         lines.append(f"| {r['file']} | {verdict(r)} | {r.get('clauses', '')} | "
@@ -169,6 +245,11 @@ def report_md(results: list[dict]) -> str:
         if "error" in r:
             lines.append(f"Error: {r['error']}")
             continue
+        if r.get("numbers_changed"):
+            lines.append(f"Numbers that differ from Word ({len(r['numbers_changed'])}): "
+                         + ", ".join(r["numbers_changed"][:15]))
+        if (r.get("office_numbers") or {}).get("differ"):
+            lines.append("Numbers that differ from LibreOffice's reading: " + ", ".join(r["office_numbers"]["differ"][:15]))
         if r["skipped_levels"]:
             lines.append("Skipped levels: " + ", ".join(r["skipped_levels"][:20]))
         for t in r["plain_but_numbered"]:

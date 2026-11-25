@@ -78,7 +78,7 @@ def test_table(sample):
 def test_markdown_never_turns_numbers_into_lists(tmp_path):
     doc = import_docx(write_docx(tmp_path / "d.docx", [
         para({"text": "Scope", "style": "Heading1"}),
-        para("1. something typed that looks like a list."),
+        para("2. something typed that looks like a list."),
         para("- a dash at the start"),
     ]))
     md = render.to_markdown(doc)

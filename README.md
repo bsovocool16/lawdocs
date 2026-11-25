@@ -12,8 +12,10 @@ time, so numbering can't drift, and there is no direct formatting to fight.
 - **.docx import.** Reads Word's styles and multilevel lists (including
   style-linked headings, list restarts and hand-typed numbers), accepts
   tracked changes, keeps bold and italic, and drops everything else.
-- **Legal numbering.** 1. / 1.1 / (a) / (i) / (A) / (1), recomputed from
-  structure. Full references like `2.1(b)(ii)` for every clause.
+- **Legal numbering.** Recomputed from structure, in the document's own
+  forms (1.1.1, Article I, (1), a.; 1. / 1.1 / (a) / (i) / (A) / (1) for new
+  documents), with restarts and alternative clauses kept. Full references
+  like `2.1(b)(ii)` for every clause.
 - **Outline.** Every clause's reference, caption and opening words, with
   block ids, so Claude can jump to a clause instead of grepping.
 - **Claude Docs output.** Markdown that writes cleanly into a Claude Doc,
@@ -24,9 +26,11 @@ time, so numbering can't drift, and there is no direct formatting to fight.
   template (LaTeX-style: blocks are content, the source is the document
   class). Untouched paragraphs come back exactly as they were in Word,
   fields and all;
-  new or moved ones take the house style for their level; numbering is
-  Word's own auto-numbering; footnotes, section breaks, headers and footers
-  survive. Tested on the NVCA model SPA (210 clauses, 108 footnotes).
+  new or moved ones are numbered like their siblings (Word's auto-numbering,
+  or typed where the source typed numbers); footnotes, section breaks,
+  headers and footers survive. Tested on the NVCA model SPA (210 clauses,
+  108 footnotes) and a corpus of 17 public model contracts
+  (`tools/corpus_check.py`).
 
 ## Use
 

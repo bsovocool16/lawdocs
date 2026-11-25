@@ -27,7 +27,7 @@ the Word failure mode this project exists to remove.
 | --- | --- |
 | `model.py` | `Block` / `Document` / `Run`. The only structural fields are `kind` and `level`. |
 | `docx_import.py` | Reads document.xml, styles.xml and numbering.xml. Resolves list numbers the way Word displays them (style-linked lists, overrides, restarts), converts hand-typed numbers to structure, accepts tracked changes, keeps bold/italic, drops all other formatting. |
-| `numbering.py` | The legal scheme (1. / 1.1 / (a) / (i) / (A) / (1)), counters, full references (`1.1(a)(i)`), and classification of existing numbers into levels. |
+| `numbering.py` | Counters, number styles, full references (`1.1(a)(i)`), the default legal scheme (1. / 1.1 / (a) / (i) / (A) / (1)), and reading existing numbers into levels, styles, restarts and alternatives. |
 | `render.py` | Markdown for Claude Docs, plus the block map that ties each lawdocs block to the Claude Docs paragraphs it produced. |
 | `outline.py` | The document's structured outline for people and agents. |
 | `md_import.py` | Reads a Claude Doc's Markdown export back into blocks and lines them up with the previous model, so surviving blocks keep their id, author and Word data. |
@@ -77,16 +77,37 @@ Claude Docs never sees any of it. On export:
   caps and live REF cross-references, which then follow renumbering in Word;
 - an edited block with its original kind and level gets its original
   paragraph properties back and its text rebuilt (bold, italic, footnotes);
-- a new or moved block takes the properties most used for its kind and level
-  in the template (house style);
-- clause numbers come from Word's numbering, never typed text: the
-  template's multilevel list where its styles carry one, otherwise a legal
-  list lawdocs adds to numbering.xml;
+- a new or moved clause is numbered the way its nearest sibling is: in the
+  sibling's Word list (so Word counts them together) or typed like it;
+  without a sibling it takes the properties most used for its kind and
+  level (house style);
+- a clause the source numbered by hand stays typed, with lawdocs writing the
+  current number; untouched, it goes back verbatim. A clause with no
+  numbering at all gets a legal list lawdocs adds to numbering.xml;
 - footnotes are rebuilt as Word footnotes (original XML when unchanged), and
   bookmarks are re-created so REF fields in footnotes still resolve.
 
 Checked on the NVCA model SPA: an unedited round trip renders identically
-to the source on all 107 pages (LibreOffice, pixel comparison).
+to the source on all 107 pages (LibreOffice, pixel comparison). For a wider
+check, `tools/corpus_check.py` runs import, the Claude Docs read-back and
+export over a folder of documents and compares numbers with what
+LibreOffice shows and pages pixel by pixel.
+
+## Numbers
+
+Only counters come from structure. How a clause's number is written is its
+`style`, a template with the counters as slots, e.g.
+`{1:decimal}.{2:decimal}.{n:decimal}` for "1.1.1" or `Article {n:upperRoman}`.
+Import sets each clause's style from the number Word showed, so a document
+keeps its own forms (1.1.1, Article I, (1), a.); a clause without a style takes
+the style of the clause before it at the same level, else the default legal
+scheme. Two flags keep imported numbers equal to the source's: `restart` (a
+schedule or part numbers from 1 again) and `alternative` (a model form's
+"[Alternative] 4.4.4", which repeats the number before it).
+
+Levels are read in context: numbers that spell out their depth ("1.1.1",
+"Article 2") take it; "(a)", "(1)", "(i)" nest under the deepest open clause
+unless they match the form of one still open.
 
 Known gaps: an edited paragraph keeps only bold, italic and footnotes from
 its runs (underlining and fields inside it are lost); cross-references typed
