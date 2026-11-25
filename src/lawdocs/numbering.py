@@ -179,7 +179,9 @@ _PAREN = re.compile(r"^\(([0-9]+|[a-z]{1,3}|[A-Z]{1,3})\)\s*")
 # split off typed text (too easily a person's initial: "A. Smith").
 _LETTER_DOT = re.compile(r"([0-9]+|[a-z]{1,3}|[A-Z]{1,3})[.)]")
 
-_ROMAN_LIKE = set("ivxlcdm")
+# Contract sub-paragraphs never run past (xxxix), so only i, v and x make a
+# label roman; "(c)" or "(d)" is always a letter.
+_ROMAN_LIKE = set("ivx")
 
 
 def classify_label(label: str, prev_alpha_lower: str | None = None,

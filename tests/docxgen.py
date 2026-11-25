@@ -98,7 +98,7 @@ def para(p: dict | str) -> str:
     if inner:
         ppr = f"<w:pPr>{inner}</w:pPr>"
     runs = p.get("runs") or [(p.get("text", ""), "")]
-    return f"<w:p>{ppr}{''.join(_run(t, f) for t, f in runs)}</w:p>"
+    return f"<w:p>{ppr}{''.join(_run(t, f) for t, f in runs)}{p.get('tail', '')}</w:p>"
 
 
 def table(rows: list[list[str]]) -> str:
@@ -106,13 +106,31 @@ def table(rows: list[list[str]]) -> str:
     return f"<w:tbl>{trs}</w:tbl>"
 
 
-def write_docx(path: str | Path, body: list[str]) -> Path:
+SECT = '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>'
+
+
+def footnote_ref(fid: int) -> str:
+    return f'<w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteReference w:id="{fid}"/></w:r>'
+
+
+def write_docx(path: str | Path, body: list[str], footnotes: dict[int, str] | None = None) -> Path:
     path = Path(path)
-    doc = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="{W}"><w:body>{"".join(body)}</w:body></w:document>'
+    doc = f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="{W}"><w:body>{"".join(body)}{SECT}</w:body></w:document>'
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("[Content_Types].xml", CONTENT_TYPES)
+        ct, rels = CONTENT_TYPES, DOC_RELS
+        if footnotes:
+            ct = ct.replace("</Types>", '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/></Types>')
+            rels = rels.replace("</Relationships>", '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/></Relationships>')
+            notes = "".join(
+                f'<w:footnote w:id="{i}"><w:p><w:r><w:rPr><w:rStyle w:val="FootnoteReference"/></w:rPr><w:footnoteRef/></w:r>'
+                f'<w:r><w:t xml:space="preserve"> {escape(t)}</w:t></w:r></w:p></w:footnote>' for i, t in footnotes.items())
+            z.writestr("word/footnotes.xml", f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:footnotes xmlns:w="{W}">'
+                       '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+                       '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>'
+                       f"{notes}</w:footnotes>")
+        z.writestr("[Content_Types].xml", ct)
         z.writestr("_rels/.rels", RELS)
-        z.writestr("word/_rels/document.xml.rels", DOC_RELS)
+        z.writestr("word/_rels/document.xml.rels", rels)
         z.writestr("word/document.xml", doc)
         z.writestr("word/styles.xml", STYLES)
         z.writestr("word/numbering.xml", NUMBERING)

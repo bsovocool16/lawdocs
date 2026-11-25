@@ -17,9 +17,10 @@ the Word failure mode this project exists to remove.
 ## Components
 
 ```
-.docx ──► docx_import ──► Document (blocks) ──► numbering.apply ──► render ──► Claude Docs
-                               │                                     │
-                               └──► outline (refs, captions, ids)    └──► blockmap ──► binding
+.docx ──► docx_import ──► Document (blocks + Word data) ──► render ──► Claude Docs
+  │                              ▲                                      │ edits by people and Claude
+  │ (kept as template)           └──────────── md_import.pull ◄─────────┘ Markdown export
+  └──────────────────────────────► docx_export ──► .docx
 ```
 
 | Module | Job |
@@ -29,7 +30,9 @@ the Word failure mode this project exists to remove.
 | `numbering.py` | The legal scheme (1. / 1.1 / (a) / (i) / (A) / (1)), counters, full references (`1.1(a)(i)`), and classification of existing numbers into levels. |
 | `render.py` | Markdown for Claude Docs, plus the block map that ties each lawdocs block to the Claude Docs paragraphs it produced. |
 | `outline.py` | The document's structured outline for people and agents. |
-| `cli.py` | `lawdocs import / render / outline`. |
+| `md_import.py` | Reads a Claude Doc's Markdown export back into blocks and lines them up with the previous model, so surviving blocks keep their id, author and Word data. |
+| `docx_export.py` | Writes .docx using the source as the template (see below). |
+| `cli.py` | `lawdocs import / render / outline / pull / export`. |
 | `.claude/skills/lawdocs-import` | How Claude runs the import and writes the result into Claude Docs. |
 
 ### Why the level comes from the displayed number
@@ -59,6 +62,27 @@ the fallback.
 Three Docs features would make lawdocs simpler, worth raising with the
 Claude Docs team: per-level ordered-list formats (1 / 1.1 / (a) / (i)),
 named revisions, and a block's last writer in reads.
+
+## Word round trip
+
+The source .docx is kept as the template, and each block carries the raw
+Word data it came from (paragraph properties, caption form, style-separator
+partner, bookmarks, raw table and footnote XML, spacer paragraphs after it).
+Claude Docs never sees any of it. On export:
+
+- a block with its original kind and level gets its original paragraph
+  properties back, so untouched text is laid out exactly as before;
+- a new or moved block takes the properties most used for its kind and level
+  in the template (house style);
+- clause numbers come from Word's numbering, never typed text: the
+  template's multilevel list where its styles carry one, otherwise a legal
+  list lawdocs adds to numbering.xml;
+- footnotes are rebuilt as Word footnotes (original XML when unchanged), and
+  bookmarks are re-created so REF fields in footnotes still resolve.
+
+Known gaps: run formatting beyond bold/italic (small caps, colour), static
+cross-reference text ("Section 2.15") does not follow renumbering yet
+(phase 3), and Word comments are not carried.
 
 ## State outside the doc
 

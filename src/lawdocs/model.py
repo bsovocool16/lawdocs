@@ -33,6 +33,16 @@ class Run:
     text: str
     bold: bool = False
     italic: bool = False
+    # Read on import only, as a caption signal ("Capitalization." underlined);
+    # never stored or rendered.
+    underline: bool = field(default=False, compare=False, repr=False)
+    # A footnote marker, written as superscript digits ("³"), kept as its own run.
+    note: bool = field(default=False, compare=False, repr=False)
+
+    def same_format(self, other: "Run") -> bool:
+        if self.note or other.note:
+            return False
+        return (self.bold, self.italic, self.underline) == (other.bold, other.italic, other.underline)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"text": self.text}
@@ -40,6 +50,8 @@ class Run:
             d["bold"] = True
         if self.italic:
             d["italic"] = True
+        if self.note:
+            d["note"] = True
         return d
 
 
@@ -59,6 +71,11 @@ class Block:
     rows: list[list[str]] | None = None
     # Who wrote this block: "import:<file>", "user", "claude". Phase 2 keeps this current.
     author: str | None = None
+    # Word round-trip data captured on import: the source paragraph's raw
+    # properties (pPr XML), caption form, spacer paragraphs that followed it,
+    # raw table XML. Never shown in Claude Docs; used only by docx_export to
+    # rebuild the paragraph exactly as the template formats it.
+    word: dict[str, Any] | None = None
 
     @property
     def text(self) -> str:
@@ -68,7 +85,7 @@ class Block:
         d: dict[str, Any] = {"id": self.id, "kind": self.kind, "level": self.level}
         if self.runs:
             d["runs"] = [r.to_dict() for r in self.runs]
-        for key in ("number", "source_number", "caption", "rows", "author"):
+        for key in ("number", "source_number", "caption", "rows", "author", "word"):
             val = getattr(self, key)
             if val is not None:
                 d[key] = val
@@ -86,6 +103,7 @@ class Block:
             caption=d.get("caption"),
             rows=d.get("rows"),
             author=d.get("author"),
+            word=d.get("word"),
         )
 
 
@@ -94,14 +112,26 @@ class Document:
     blocks: list[Block]
     source: str | None = None
     warnings: list[str] = field(default_factory=list)
+    # Footnotes, in order of first reference: [{"n": 1, "text": "..."}].
+    # Claude Docs has no footnotes, so they render as superscript markers plus a
+    # Footnotes section at the end.
+    notes: list[dict[str, Any]] = field(default_factory=list)
+    # Word round trip: where the source package is kept, and spacer paragraphs
+    # that came before the first block.
+    template: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d = {
             "format": "lawdocs/1",
             "source": self.source,
             "warnings": self.warnings,
             "blocks": [b.to_dict() for b in self.blocks],
         }
+        if self.notes:
+            d["notes"] = self.notes
+        if self.template:
+            d["template"] = self.template
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Document":
@@ -109,10 +139,27 @@ class Document:
             blocks=[Block.from_dict(b) for b in d["blocks"]],
             source=d.get("source"),
             warnings=list(d.get("warnings", [])),
+            notes=list(d.get("notes", [])),
+            template=d.get("template"),
         )
 
     def clauses(self) -> list[Block]:
         return [b for b in self.blocks if b.kind == "clause"]
 
 
-__all__ = ["Block", "Document", "Run", "KINDS", "MAX_LEVEL", "asdict"]
+_SUP = str.maketrans("0123456789", "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079")
+_UNSUP = {v: k for k, v in zip("0123456789", "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079")}
+SUPERSCRIPT_DIGITS = "".join(_UNSUP)
+
+
+def note_marker(n: int) -> str:
+    """Footnote 12 is written "¹²": unmistakable in text full of "[10]"-style blanks."""
+    return str(n).translate(_SUP)
+
+
+def note_number(marker: str) -> int | None:
+    digits = "".join(_UNSUP.get(c, "") for c in marker.strip())
+    return int(digits) if digits and len(digits) == len(marker.strip()) else None
+
+
+__all__ = ["Block", "Document", "Run", "KINDS", "MAX_LEVEL", "asdict", "note_marker", "note_number"]

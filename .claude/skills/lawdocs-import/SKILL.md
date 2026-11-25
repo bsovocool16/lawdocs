@@ -19,15 +19,33 @@ Claude Docs has no import of its own, so this skill is the bridge.
    - `blockmap.json`: which Markdown paragraph each block produced
 3. Tell the user any `note:` lines the command printed (tracked changes
    accepted, comments or footnotes not imported, typed numbers converted).
-4. Create the doc in ONE Claude Docs `batch` call, with `container.create.doc.markdown`
-   set to the full contents of `doc.md` and `batch: []`. Name it after the
-   document title. Do not edit numbers by hand: they come from `model.json`.
+4. Create the doc with a single `pending` block, then fill it from a blob so
+   the (often 100+ KB) Markdown never passes through your context:
+   - `batch` create with `markdown: "<?claude block s1?>"` and a pending `s1`;
+   - Artifact publish with `asset: true`, `url` = the doc's link,
+     `file_path` = `doc.md` → an asset id;
+   - Docs `create` object `blob` with `{"asset": "<asset id>"}` → `blob/<id>`;
+   - `update` the body: `replace` the pending block with
+     `{"from": {"kind": "blob", "id": "blob/<id>"}, "as": "markdown"}`.
+   Do not edit numbers by hand: they come from `model.json`.
 5. The ack's `xml` lists the new doc's paragraph ids in order. Paragraph *k*
    in that list is paragraph *k* in `blockmap.json`; save the pairing as
    `out/<name>/binding.json` (`{"doc": <doc id>, "node": <body id>, "blocks": {<lawdocs id>: [<docs ids>]}}`)
    so later passes can find a clause's Claude Docs block directly.
 6. Open the doc for the user and give them the outline (`outline.md`) if they
    asked for one.
+
+## Back to Word
+
+1. Docs `create` object `blob` with `{"from": {"object": "file", "id": "<tab id>"}, "format": "markdown"}`
+   → an asset id; Artifact `read` with `path` = that asset id saves the
+   Markdown locally.
+2. `lawdocs pull <that.md> --base out/<name>/model.json --editor claude`
+3. `lawdocs export out/<name>/model.json -o <name>-edited.docx`
+
+Word numbers the clauses itself on export, so a clause added or deleted in
+the doc renumbers everything after it. Cross-reference text does not update
+yet: say so when clauses moved.
 
 ## Navigating with the outline
 

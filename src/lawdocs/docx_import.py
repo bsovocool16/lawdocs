@@ -30,7 +30,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from . import numbering as num
-from .model import Block, Document, Run
+from .model import Block, Document, Run, note_marker
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 NS = {"w": W}
@@ -217,19 +217,21 @@ def _read_numbering(root: ET.Element | None) -> Numbering:
 # --------------------------------------------------------------------------
 
 _SKIP_SUBTREES = {q("del"), q("moveFrom"), q("instrText"), q("delText"), q("rPr"), q("pPr"),
-                  q("footnoteReference"), q("endnoteReference"), q("commentReference")}
+                  q("endnoteReference"), q("commentReference")}
 
 
-def _runs(p: ET.Element) -> list[Run]:
+def _runs(p: ET.Element, footnote=None) -> list[Run]:
+    """Text runs of a paragraph. ``footnote(id) -> marker`` is called for each footnote reference."""
     runs: list[Run] = []
 
-    def emit(text: str, bold: bool, italic: bool) -> None:
+    def emit(text: str, bold: bool, italic: bool, underline: bool = False, note: bool = False) -> None:
         if not text:
             return
-        if runs and runs[-1].bold == bold and runs[-1].italic == italic:
+        r = Run(text, bold, italic, underline, note)
+        if runs and runs[-1].same_format(r):
             runs[-1].text += text
         else:
-            runs.append(Run(text, bold, italic))
+            runs.append(r)
 
     def walk(el: ET.Element) -> None:
         for child in el:
@@ -239,15 +241,21 @@ def _runs(p: ET.Element) -> list[Run]:
                 rpr = child.find("w:rPr", NS)
                 bold = _on(rpr.find("w:b", NS)) if rpr is not None else False
                 italic = _on(rpr.find("w:i", NS)) if rpr is not None else False
+                u = rpr.find("w:u", NS) if rpr is not None else None
+                underline = u is not None and _val(u) != "none"
+                if rpr is not None and _on(rpr.find("w:vanish", NS)):
+                    continue  # hidden text
                 for part in child:
                     if part.tag == q("t"):
-                        emit(part.text or "", bold, italic)
-                    elif part.tag in (q("tab"), q("ptab")):
-                        emit(" ", bold, italic)
-                    elif part.tag in (q("br"), q("cr")):
-                        emit(" ", bold, italic)
+                        emit(part.text or "", bold, italic, underline)
+                    elif part.tag in (q("tab"), q("ptab"), q("br"), q("cr")):
+                        emit(" ", bold, italic, underline)
                     elif part.tag == q("noBreakHyphen"):
-                        emit("-", bold, italic)
+                        emit("-", bold, italic, underline)
+                    elif part.tag == q("footnoteReference") and footnote is not None:
+                        marker = footnote(part.get(q("id")))
+                        if marker:
+                            emit(marker, False, False, note=True)
             else:
                 walk(child)
 
@@ -258,8 +266,8 @@ def _runs(p: ET.Element) -> list[Run]:
 def _normalise(runs: list[Run]) -> list[Run]:
     out: list[Run] = []
     for r in runs:
-        r.text = re.sub(r"[ \t ]+", " ", r.text)
-        if out and out[-1].bold == r.bold and out[-1].italic == r.italic:
+        r.text = re.sub(r"[ \t\u00a0]+", " ", r.text)
+        if out and out[-1].same_format(r):
             out[-1].text += r.text
         else:
             out.append(r)
@@ -281,7 +289,7 @@ def _strip_prefix(runs: list[Run], n_chars: int) -> list[Run]:
         elif len(r.text) <= n_chars:
             n_chars -= len(r.text)
         else:
-            out.append(Run(r.text[n_chars:], r.bold, r.italic))
+            out.append(Run(r.text[n_chars:], r.bold, r.italic, r.underline))
             n_chars = 0
     return _normalise(out)
 
@@ -293,14 +301,26 @@ def _split_caption(runs: list[Run], level: int) -> tuple[str | None, list[Run]]:
     """Pull a clause caption ("Payment." / "DEFINITIONS") off the front of a clause."""
     if not runs:
         return None, runs
+    # An optional caption in brackets: "[" + underlined "Waiver of Conflicts" + ". ..."
+    if len(runs) > 1 and runs[0].text.strip() == "[" and (runs[1].bold or runs[1].underline):
+        cap, rest = _split_caption(runs[1:], level)
+        if cap is not None:
+            return "[" + cap, rest
+        return None, runs
     text = "".join(r.text for r in runs)
     # A leading bold phrase that ends in a period or colon: "Payment. The Buyer shall..."
     first = runs[0]
-    if first.bold:
-        m = re.match(r"^([^.:]{1,80})[.:]\s*", first.text)
-        if m and len(m.group(1).split()) <= 10 and not m.group(1).startswith('"'):
+    if (first.bold or first.underline) and re.match(r"^\[?[A-Z0-9]", first.text):
+        m = re.match(r"^([^.:]{1,80})[.:](?![0-9])\s*", first.text)
+        if m and len(m.group(1).split()) <= 10 and not m.group(1).startswith(('"', "\u201c")):
             rest = [Run(first.text[m.end():], first.bold, first.italic)] + runs[1:]
             return m.group(1).strip(), _normalise(rest)
+        # A footnote marker between the caption and its period: "Caption[80]. Text"
+        note = len(runs) > 2 and runs[1].note
+        if note and runs[2].text.lstrip()[:1] in (".", ":") and len(first.text.split()) <= 10:
+            rest = [Run(runs[2].text.lstrip()[1:].lstrip(), runs[2].bold, runs[2].italic)] + runs[3:]
+            body = _normalise(rest)
+            return first.text.strip(), ([runs[1], Run(" ")] + body) if body else [runs[1]]
         if len(runs) > 1 and len(first.text.split()) <= 10 and runs[1].text.lstrip()[:1] in (".", ":"):
             rest = [Run(runs[1].text.lstrip()[1:], runs[1].bold, runs[1].italic)] + runs[2:]
             return first.text.strip(), _normalise(rest)
@@ -331,6 +351,61 @@ def _is_caps_heading(text: str) -> bool:
 # --------------------------------------------------------------------------
 
 
+def _bookmarks(p: ET.Element) -> list[str]:
+    """Bookmark names in a paragraph. Word cross-references (REF fields, often in
+    footnotes) point at them, so they are re-created on export."""
+    return [n for b in p.iter(q("bookmarkStart")) if (n := b.get(q("name"))) and n != "_GoBack"]
+
+
+def _is_style_separator(p: ET.Element) -> bool:
+    """A paragraph whose mark is hidden (Word's "style separator"): it runs on
+    into the next paragraph, typically a heading-styled caption followed by body text."""
+    mark = p.find("w:pPr/w:rPr", NS)
+    return mark is not None and (mark.find("w:specVanish", NS) is not None or _on(mark.find("w:vanish", NS)))
+
+
+def _read_footnotes(root: ET.Element | None) -> tuple[dict[str, str], dict[str, str]]:
+    """Footnote text and raw XML by footnote id."""
+    text: dict[str, str] = {}
+    raw: dict[str, str] = {}
+    if root is None:
+        return text, raw
+    for f in root.findall("w:footnote", NS):
+        if f.get(q("type")) in ("separator", "continuationSeparator", "continuationNotice"):
+            continue
+        fid = f.get(q("id")) or ""
+        parts = ["".join(r.text for r in _runs(p)) for p in f.findall(".//w:p", NS)]
+        text[fid] = " ".join(t for t in parts if t)
+        raw[fid] = xml_str(f)
+    return text, raw
+
+
+# --------------------------------------------------------------------------
+# Raw XML for the round trip
+# --------------------------------------------------------------------------
+
+_NS_DECL = re.compile(r'\sxmlns:([A-Za-z0-9]+)="([^"]*)"')
+_KNOWN_NS: dict[str, str] = {}
+
+
+def register_namespaces(xml: bytes) -> None:
+    """Make ElementTree write the source package's own prefixes (w:, w14:, ...)."""
+    head = xml[:20000].decode("utf8", "replace")
+    for prefix, uri in _NS_DECL.findall(head):
+        if prefix not in ("xml",) and _KNOWN_NS.get(prefix) != uri:
+            try:
+                ET.register_namespace(prefix, uri)
+                _KNOWN_NS[prefix] = uri
+            except ValueError:
+                pass
+
+
+def xml_str(el: ET.Element) -> str:
+    """Serialise an element without the namespace declarations the package root already makes."""
+    s = ET.tostring(el, encoding="unicode")
+    return _NS_DECL.sub(lambda m: "" if _KNOWN_NS.get(m.group(1)) == m.group(2) else m.group(0), s)
+
+
 class _Importer:
     def __init__(self, styles: dict[str, Style], numbering: Numbering, source: str):
         self.styles = styles
@@ -343,6 +418,15 @@ class _Importer:
         self.prev_alpha_upper: str | None = None
         self.typed_numbers = 0
         self.bullets = 0
+        self.style_separators = 0
+        self.held: ET.Element | None = None
+        self.footnote_texts: dict[str, str] = {}
+        self.footnote_xml: dict[str, str] = {}
+        self.notes: list[dict] = []
+        # Word round trip: raw properties of the paragraph being imported, and
+        # spacer paragraphs seen before the first block.
+        self._word: dict = {}
+        self.front: list[str] = []
 
     def _new_id(self) -> str:
         return f"b{len(self.blocks) + 1:04d}"
@@ -350,8 +434,21 @@ class _Importer:
     def _add(self, kind: str, level: int, runs: list[Run], **kw) -> Block:
         b = Block(id=self._new_id(), kind=kind, level=level, runs=runs,
                   author=f"import:{self.source}", **kw)
+        word = {k: v for k, v in self._word.items() if v is not None}
+        word.update(kind=kind, level=level)
+        b.word = word
+        self._word = {}
         self.blocks.append(b)
         return b
+
+    def _spacer(self, p: ET.Element) -> None:
+        """An empty paragraph: nothing in Claude Docs, but kept for the Word round trip
+        (it may hold a page break, a section break or deliberate spacing)."""
+        raw = xml_str(p)
+        if self.blocks:
+            self.blocks[-1].word.setdefault("after", []).append(raw)
+        else:
+            self.front.append(raw)
 
     def _num_props(self, ppr: ET.Element | None, style_id: str | None) -> tuple[str | None, int]:
         num_id: str | None = None
@@ -392,26 +489,60 @@ class _Importer:
             self.prev_alpha_lower = self.prev_alpha_upper = None
         caption, body = _split_caption(runs, level)
         text = "".join(r.text for r in runs).strip()
-        if heading and caption is None and len(text.split()) <= 12 and not text.endswith((".", ":", ";", ",")):
+        if (heading and caption is None and level <= 2 and not any(r.note for r in runs)
+                and len(text.split()) <= 12 and not text.endswith((".", ":", ";", ",", "]"))):
             caption, body = text, []
+        if caption is not None:
+            lead = runs[1] if runs and runs[0].text.strip() == "[" and len(runs) > 1 else (runs[0] if runs else None)
+            form = "u" if lead and lead.underline else "b" if lead and lead.bold else "plain"
+            core = caption.lstrip("[")
+            after = re.sub(r"^\s*\[\d+\]", "", text[text.find(core) + len(core):]).lstrip()
+            self._word["caption"] = {"form": form, "punct": after[:1] if after[:1] in (".", ":") else ""}
         self._add("clause", level, body, source_number=label, caption=caption)
         self.current_level = level
 
-    def paragraph(self, p: ET.Element) -> None:
+    def footnote(self, fid: str | None) -> str | None:
+        text = self.footnote_texts.get(fid or "")
+        if text is None:
+            return None
+        n = len(self.notes) + 1
+        self.notes.append({"n": n, "text": text, "word": self.footnote_xml.get(fid or "")})
+        return note_marker(n)
+
+    def paragraph(self, p: ET.Element, sep: ET.Element | None = None) -> None:
+        """One block from a paragraph. ``sep`` is the paragraph that follows a
+        style separator, which Word displays on the same line."""
         ppr = p.find("w:pPr", NS)
         style_id = _val(ppr.find("w:pStyle", NS)) if ppr is not None else None
-        runs = _runs(p)
+        runs = _runs(p, self.footnote)
+        self._word = {"pPr": xml_str(ppr) if ppr is not None else None}
+        marks = _bookmarks(p) + (_bookmarks(sep) if sep is not None else [])
+        if marks:
+            self._word["bookmarks"] = marks
+        if sep is not None:
+            sep_ppr = sep.find("w:pPr", NS)
+            self._word["sep_pPr"] = xml_str(sep_ppr) if sep_ppr is not None else ""
+            runs = _normalise(runs + _runs(sep, self.footnote))
         text = "".join(r.text for r in runs)
         num_id, ilvl = self._num_props(ppr, style_id)
         label = self.numbering.next_label(num_id, ilvl) if num_id else None
         if not text.strip():
-            return  # Spacing is the renderer's job; empty paragraphs carry nothing.
+            if label and label != "\u2022" and num.classify_label(label) is None:
+                # A numbered paragraph whose whole content is its label ("Exhibit A").
+                self._word["label_only"] = True
+                self._add("heading", 0, [Run(label.replace("\u00a0", " "))])
+                self.current_level = 0
+            else:
+                self._word = {}
+                self._spacer(p)
+            return
 
         heading_lvl = _heading_level(self.styles, style_id)
 
         if label == "•":
             self.bullets += 1
-            self._add("text", self.current_level, [Run("• ")] + runs)
+            self._word["bullet"] = True  # Word draws the bullet; the text copy is for Claude Docs
+            self._add("text", self.current_level, [Run("\u2022 ")] + runs)
             return
         if label:
             self._clause(label, ilvl + 1, runs, heading=heading_lvl is not None)
@@ -429,9 +560,12 @@ class _Importer:
                 return
 
         has_clause = any(b.kind == "clause" for b in self.blocks)
-        if not self.blocks and (_is_title_style(self.styles, style_id) or _is_caps_heading(text)):
+        has_title = any(b.kind == "title" for b in self.blocks)
+        if not has_title and not has_clause and (_is_title_style(self.styles, style_id) or _is_caps_heading(text)):
             self._add("title", 0, runs)
             return
+        if re.match(r"^\[?(IN WITNESS WHEREOF|\[?Signature Page)", text, re.I):
+            self.current_level = 0
         if _is_title_style(self.styles, style_id):
             self._add("title" if not any(b.kind == "title" for b in self.blocks) else "heading", 0, runs)
             return
@@ -457,6 +591,7 @@ class _Importer:
                 row.append(" ".join(parts))
             rows.append(row)
         if any(any(c for c in r) for r in rows):
+            self._word = {"tbl": xml_str(tbl), "rows": rows}
             self._add("table", self.current_level, [], rows=rows)
         if numbered:
             self.warnings.append("A table contains numbered paragraphs; their numbers were not imported.")
@@ -464,7 +599,14 @@ class _Importer:
     def body(self, body: ET.Element) -> None:
         for child in body:
             if child.tag == q("p"):
-                self.paragraph(child)
+                if self.held is not None:
+                    held, self.held = self.held, None
+                    self.paragraph(held, sep=child)
+                elif _is_style_separator(child):
+                    self.held = child
+                    self.style_separators += 1
+                else:
+                    self.paragraph(child)
             elif child.tag == q("tbl"):
                 self.table(child)
             elif child.tag == q("sdt"):
@@ -483,17 +625,28 @@ def _load(z: zipfile.ZipFile, name: str) -> ET.Element | None:
 def import_docx(path: str | Path) -> Document:
     path = Path(path)
     with zipfile.ZipFile(path) as z:
-        document = _load(z, "word/document.xml")
-        if document is None:
-            raise ValueError(f"{path} has no word/document.xml; is it a .docx?")
+        try:
+            raw_doc = z.read("word/document.xml")
+        except KeyError:
+            raise ValueError(f"{path} has no word/document.xml; is it a .docx?") from None
+        register_namespaces(raw_doc)
+        document = ET.fromstring(raw_doc)
         styles = _read_styles(_load(z, "word/styles.xml"))
         numbering = _read_numbering(_load(z, "word/numbering.xml"))
-        footnotes = _load(z, "word/footnotes.xml")
+        try:
+            raw_fn = z.read("word/footnotes.xml")
+            register_namespaces(raw_fn)
+            footnotes = ET.fromstring(raw_fn)
+        except KeyError:
+            footnotes = None
 
     imp = _Importer(styles, numbering, path.name)
+    imp.footnote_texts, imp.footnote_xml = _read_footnotes(footnotes)
     body = document.find("w:body", NS)
     if body is not None:
         imp.body(body)
+        if imp.held is not None:
+            imp.paragraph(imp.held)
 
     warnings = imp.warnings
     ins = len(document.findall(".//w:ins", NS))
@@ -503,16 +656,17 @@ def import_docx(path: str | Path) -> Document:
     comments = len(document.findall(".//w:commentRangeStart", NS))
     if comments:
         warnings.append(f"{comments} Word comments were not imported.")
-    if footnotes is not None:
-        n_fn = sum(1 for f in footnotes.findall("w:footnote", NS)
-                   if f.get(q("type")) not in ("separator", "continuationSeparator", "continuationNotice"))
-        if n_fn:
-            warnings.append(f"{n_fn} footnotes were not imported.")
+    if imp.notes:
+        warnings.append(f"Moved {len(imp.notes)} footnotes to a Footnotes section at the end "
+                        "(Claude Docs has no footnotes); each keeps a superscript marker in the text.")
+    if imp.style_separators:
+        warnings.append(f"Joined {imp.style_separators} heading/text pairs split by Word style separators.")
     if imp.typed_numbers:
         warnings.append(f"Converted {imp.typed_numbers} hand-typed numbers into structure.")
     if imp.bullets:
         warnings.append(f"Kept {imp.bullets} bulleted paragraphs as text.")
 
-    doc = Document(blocks=imp.blocks, source=path.name, warnings=warnings)
+    doc = Document(blocks=imp.blocks, source=path.name, warnings=warnings, notes=imp.notes,
+                   template={"front": imp.front})
     num.apply(doc)
     return doc

@@ -10,11 +10,11 @@ Customer wishes to engage Provider to perform the Services.
 
 1.1 **Defined Terms.** In this Agreement:
 
-(a) **"Affiliate"** means any entity that controls, is controlled by, or is under common control with a party;
+(a) "**Affiliate**" means any entity that controls, is controlled by, or is under common control with a party;
 
-(b) **"Services"** means the services described in Section 2.1; and
+(b) "**Services**" means the services described in Section 2.1; and
 
-(c) **"Fees"** means the amounts set out in Schedule 1.
+(c) "**Fees**" means the amounts set out in Schedule 1.
 
 1.2 **Interpretation.** Headings are for convenience only.
 
