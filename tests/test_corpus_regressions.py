@@ -271,3 +271,28 @@ def test_empty_fill_in_tables_survive_export(tmp_path):
     out = export_docx(doc, src, tmp_path / "out.docx")
     xml = zipfile.ZipFile(out).read("word/document.xml").decode()
     assert xml.count("<w:tbl>") == 1 and xml.index("<w:tbl>") < xml.index("Address for notices")
+
+
+# A typed number that doesn't follow the count (Lambert Agreement 6: "23.4"
+# typed inside clause 20) stays as typed until someone edits that clause.
+def test_typed_number_typo_kept_until_edited(tmp_path):
+    src = write_docx(tmp_path / "typo.docx", [
+        para({"text": "1. Each party shall comply with the law."}),
+        para({"text": "2. Each party shall protect data as follows."}),
+        para({"text": "2.1 The parties shall cooperate."}),
+        para({"text": "2.2 Each party shall notify."}),
+        para({"text": "5.3 Each Controller shall assist."}),
+        para({"text": "2.4 This clause survives."}),
+    ])
+    doc = import_docx(src)
+    assert numbers(doc)[2:] == ["2.1", "2.2", "5.3", "2.4"]
+    out = export_docx(doc, src, tmp_path / "out.docx")
+    assert ">5.3 Each Controller" in zipfile.ZipFile(out).read("word/document.xml").decode()
+    assert "5.3" in render.to_markdown(doc)
+    typo = next(b for b in doc.blocks if b.text.startswith("Each Controller"))
+    typo.runs = [Run("Each Controller shall promptly assist.")]
+    num.apply(doc)
+    assert typo.number == "2.3"
+    out = export_docx(doc, src, tmp_path / "edited.docx")
+    xml = zipfile.ZipFile(out).read("word/document.xml").decode()
+    assert ">2.3 <" in xml and "5.3" not in xml

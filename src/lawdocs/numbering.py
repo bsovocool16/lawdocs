@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .model import MAX_LEVEL, Block, Document
+from .model import MAX_LEVEL, Block, Document, signature
 
 # --------------------------------------------------------------------------
 # Counter formatting
@@ -227,6 +227,16 @@ def apply(doc: Document, scheme: Scheme = LEGAL) -> dict[str, str]:
         style = block.style or styles.get(level) or scheme.level(level).label
         styles[level] = style
         block.number = render_style(style, counters, level, scheme)
+        kept = _kept_typed(block, level)
+        if kept and _norm_label(kept) != _norm_label(block.number):
+            # Typed by hand in the source and not edited since: shown as typed,
+            # even where the counting disagrees (a typo such as 23.4 inside
+            # clause 20). Editing the clause gives it its computed number.
+            block.number = kept
+            ref = _bare(kept) if len(_counters_in(kept)) > 1 or level == 1 else refs_at.get(level - 1, "") + _cited_part(kept)
+            refs_at[level] = ref
+            refs[block.id] = ref
+            continue
         if level == 1 or _cites_ancestors(style, level):
             ref = _bare(block.number)
         else:
@@ -239,6 +249,37 @@ def apply(doc: Document, scheme: Scheme = LEGAL) -> dict[str, str]:
         refs_at[level] = ref
         refs[block.id] = ref
     return refs
+
+
+def _kept_typed(block: Block, level: int) -> str | None:
+    """The number typed in the source paragraph, when the block is unedited."""
+    w = block.word or {}
+    typed = w.get("typed")
+    if not typed or not typed.get("kept") or w.get("sig") != signature(block.kind, level, block.caption, block.runs):
+        return None
+    return typed["label"]
+
+
+def keep_typed_quirks(doc: Document) -> int:
+    """Mark typed numbers that disagree with the count (a source typo such as
+    23.4 inside clause 20), so they are shown as typed until the clause is
+    edited. Typed numbers that agree keep following the structure, so deleting
+    3.1 still renumbers an untouched 3.2. Returns how many were marked."""
+    apply(doc)
+    n = 0
+    for b in doc.blocks:
+        typed = (b.word or {}).get("typed")
+        if b.kind == "clause" and typed and _norm_label(typed["label"]) != _norm_label(b.number or ""):
+            typed["kept"] = True
+            n += 1
+    if n:
+        apply(doc)
+        doc.warnings.append(f"Kept {n} typed numbers that don't follow the count as typed.")
+    return n
+
+
+def _norm_label(label: str) -> str:
+    return re.sub(r"\s+", " ", label).strip().rstrip(".:").lower()
 
 
 def _bare(label: str) -> str:

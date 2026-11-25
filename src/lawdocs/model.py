@@ -188,3 +188,10 @@ def note_number(marker: str) -> int | None:
 
 
 __all__ = ["Block", "Document", "Run", "KINDS", "MAX_LEVEL", "asdict", "note_marker", "note_number"]
+
+
+def signature(kind: str, level: int, caption: str | None, runs) -> str:
+    """What a block says, ignoring run splits and spacing, so an untouched
+    paragraph is recognised after a trip through Claude Docs."""
+    text = " ".join("".join(r.text for r in runs).split())
+    return f"{kind}|{level}|{' '.join((caption or '').split())}|{text}"

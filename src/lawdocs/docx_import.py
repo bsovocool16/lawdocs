@@ -30,7 +30,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from . import numbering as num
-from .model import Block, Document, Run, note_marker
+from .model import Block, Document, Run, note_marker, signature  # noqa: F401 (signature re-exported)
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 NS = {"w": W}
@@ -445,13 +445,6 @@ def _raw_content(p: ET.Element) -> str | None:
     return "".join(xml_str(c) for c in p if c.tag != q("pPr"))
 
 
-def signature(kind: str, level: int, caption: str | None, runs) -> str:
-    """What a block says, ignoring run splits and spacing, so an untouched
-    paragraph is recognised after a trip through Claude Docs."""
-    text = " ".join("".join(r.text for r in runs).split())
-    return f"{kind}|{level}|{' '.join((caption or '').split())}|{text}"
-
-
 class _Importer:
     def __init__(self, styles: dict[str, Style], numbering: Numbering, source: str):
         self.styles = styles
@@ -748,4 +741,5 @@ def import_docx(path: str | Path) -> Document:
     doc = Document(blocks=imp.blocks, source=path.name, warnings=warnings, notes=imp.notes,
                    template={"front": imp.front})
     num.mark_restarts(doc)
+    num.keep_typed_quirks(doc)
     return doc
