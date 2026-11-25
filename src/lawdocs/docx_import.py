@@ -664,6 +664,10 @@ class _Importer:
         if any(any(c for c in r) for r in rows):
             self._word = {"tbl": xml_str(tbl), "rows": rows}
             self._add("table", self.current_level, [], rows=rows)
+        else:
+            # An empty table (a box to fill in): nothing for Claude Docs, but it
+            # goes back to Word where it was, like an empty paragraph.
+            self._spacer(tbl)
         if numbered:
             self.warnings.append("A table contains numbered paragraphs; their numbers were not imported.")
 

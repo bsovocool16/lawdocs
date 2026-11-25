@@ -253,3 +253,21 @@ def test_ordinal_text_numbers():
     style = num.label_style("Fifth:", 1, "ordinalText")
     assert num.render_style(style, [6] + [0] * 8, 1) == "Sixth:"
     assert num.counter_value("Fifth:", "ordinalText") == 5
+
+
+# An empty table (a box to fill in on a questionnaire) has nothing to show in
+# Claude Docs but must go back to Word (NVCA PIPE registration rights
+# agreement: the investor questionnaire's answer boxes were dropped).
+def test_empty_fill_in_tables_survive_export(tmp_path):
+    box = "<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>"
+    src = write_docx(tmp_path / "q.docx", [
+        para({"text": "Questionnaire", "style": "Heading1"}),
+        para("1.1 Name. Full legal name of the investor:"),
+        box,
+        para("1.2 Address. Address for notices:"),
+    ])
+    doc = import_docx(src)
+    assert not any(b.kind == "table" for b in doc.blocks)
+    out = export_docx(doc, src, tmp_path / "out.docx")
+    xml = zipfile.ZipFile(out).read("word/document.xml").decode()
+    assert xml.count("<w:tbl>") == 1 and xml.index("<w:tbl>") < xml.index("Address for notices")
