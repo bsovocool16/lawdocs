@@ -70,8 +70,13 @@ Word data it came from (paragraph properties, caption form, style-separator
 partner, bookmarks, raw table and footnote XML, spacer paragraphs after it).
 Claude Docs never sees any of it. On export:
 
-- a block with its original kind and level gets its original paragraph
-  properties back, so untouched text is laid out exactly as before;
+- a block whose kind, level and text are unchanged is written back as the
+  source paragraph itself: its properties and its runs, fields, bookmarks
+  and comment anchors, verbatim (footnote ids remapped). Untouched text keeps
+  every bit of Word formatting, including underlined defined terms, small
+  caps and live REF cross-references, which then follow renumbering in Word;
+- an edited block with its original kind and level gets its original
+  paragraph properties back and its text rebuilt (bold, italic, footnotes);
 - a new or moved block takes the properties most used for its kind and level
   in the template (house style);
 - clause numbers come from Word's numbering, never typed text: the
@@ -80,9 +85,14 @@ Claude Docs never sees any of it. On export:
 - footnotes are rebuilt as Word footnotes (original XML when unchanged), and
   bookmarks are re-created so REF fields in footnotes still resolve.
 
-Known gaps: run formatting beyond bold/italic (small caps, colour), static
-cross-reference text ("Section 2.15") does not follow renumbering yet
-(phase 3), and Word comments are not carried.
+Checked on the NVCA model SPA: an unedited round trip renders identically
+to the source on all 107 pages (LibreOffice, pixel comparison).
+
+Known gaps: an edited paragraph keeps only bold, italic and footnotes from
+its runs (underlining and fields inside it are lost); cross-references typed
+as plain text ("Section 2.15") do not follow renumbering yet (phase 3); Word
+comments survive only on untouched paragraphs and are not shown in Claude
+Docs.
 
 ## State outside the doc
 

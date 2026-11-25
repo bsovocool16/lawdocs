@@ -22,7 +22,8 @@ time, so numbering can't drift, and there is no direct formatting to fight.
 - **Round trip back to Word.** `lawdocs pull` reads the edited Claude Doc
   back; `lawdocs export` writes a .docx using the source document as its
   template (LaTeX-style: blocks are content, the source is the document
-  class). Untouched paragraphs get their original Word properties back;
+  class). Untouched paragraphs come back exactly as they were in Word,
+  fields and all;
   new or moved ones take the house style for their level; numbering is
   Word's own auto-numbering; footnotes, section breaks, headers and footers
   survive. Tested on the NVCA model SPA (210 clauses, 108 footnotes).

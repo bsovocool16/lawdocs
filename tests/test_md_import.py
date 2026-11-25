@@ -37,3 +37,24 @@ def test_edit_in_docs_then_export_renumbers(tmp_path):
     again = import_docx(export_docx(new, src, tmp_path / "out.docx"))
     assert "1.2" not in refs(again)
     assert "2.1(d)" in refs(again)
+
+
+def test_unedited_doc_pulls_back_to_a_verbatim_export(tmp_path):
+    src = write_docx(tmp_path / "a.docx", sample_agreement())
+    base = import_docx(src)
+    new = md_import.pull(render.to_markdown(base), base)
+    assert [b.level for b in new.blocks] == [b.level for b in base.blocks]
+    direct: dict = {}
+    export_docx(base, src, tmp_path / "direct.docx", direct)
+    pulled: dict = {}
+    export_docx(new, src, tmp_path / "pulled.docx", pulled)
+    # A trip through Claude Docs with no edits rebuilds nothing extra.
+    assert pulled == direct and direct["verbatim"] > 0
+
+
+def test_repeated_footnote_text_keeps_each_notes_word_data():
+    from lawdocs.model import Document
+    base = Document(blocks=[], notes=[{"n": 1, "text": "Same.", "word": '<w:footnote w:id="7"/>'},
+                                      {"n": 2, "text": "Same.", "word": '<w:footnote w:id="8"/>'}])
+    new = md_import.pull("## Footnotes\n\n¹ Same.\n\n² Same.\n", base)
+    assert [n.get("word") for n in new.notes] == ['<w:footnote w:id="7"/>', '<w:footnote w:id="8"/>']

@@ -19,8 +19,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Title\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">MASTER SERVICES AGREEMENT</w:t></w:r>",
         "kind": "title",
-        "level": 0
+        "level": 0,
+        "sig": "title|0||MASTER SERVICES AGREEMENT"
       }
     },
     {
@@ -34,8 +36,10 @@
       ],
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">This Master Services Agreement (this \"Agreement\") is entered into by Acme Corp. (\"Customer\") and Widget LLC (\"Provider\").</w:t></w:r>",
         "kind": "text",
-        "level": 0
+        "level": 0,
+        "sig": "text|0||This Master Services Agreement (this \"Agreement\") is entered into by Acme Corp. (\"Customer\") and Widget LLC (\"Provider\")."
       }
     },
     {
@@ -50,8 +54,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"PlainHeading\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">RECITALS</w:t></w:r>",
         "kind": "heading",
-        "level": 0
+        "level": 0,
+        "sig": "heading|0||RECITALS"
       }
     },
     {
@@ -65,8 +71,10 @@
       ],
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">Customer wishes to engage Provider to perform the Services.</w:t></w:r>",
         "kind": "text",
-        "level": 0
+        "level": 0,
+        "sig": "text|0||Customer wishes to engage Provider to perform the Services."
       }
     },
     {
@@ -79,12 +87,14 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading1\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Definitions</w:t></w:r>",
         "caption": {
           "form": "plain",
           "punct": ""
         },
         "kind": "clause",
-        "level": 1
+        "level": 1,
+        "sig": "clause|1|Definitions|"
       }
     },
     {
@@ -102,12 +112,14 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading2\" /></w:pPr>",
+        "content": "<w:r><w:rPr><w:b /></w:rPr><w:t xml:space=\"preserve\">Defined Terms</w:t></w:r><w:r><w:t xml:space=\"preserve\">. In this Agreement:</w:t></w:r>",
         "caption": {
           "form": "b",
           "punct": "."
         },
         "kind": "clause",
-        "level": 2
+        "level": 2,
+        "sig": "clause|2|Defined Terms|In this Agreement:"
       }
     },
     {
@@ -128,8 +140,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"2\" /><w:numId w:val=\"1\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:rPr><w:b /></w:rPr><w:t xml:space=\"preserve\">\"Affiliate\"</w:t></w:r><w:r><w:t xml:space=\"preserve\"> means any entity that controls, is controlled by, or is under common control with a party;</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||\"Affiliate\" means any entity that controls, is controlled by, or is under common control with a party;"
       }
     },
     {
@@ -150,8 +164,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"2\" /><w:numId w:val=\"1\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:rPr><w:b /></w:rPr><w:t xml:space=\"preserve\">\"Services\"</w:t></w:r><w:r><w:t xml:space=\"preserve\"> means the services described in Section 2.1; and</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||\"Services\" means the services described in Section 2.1; and"
       }
     },
     {
@@ -172,8 +188,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"2\" /><w:numId w:val=\"1\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:rPr><w:b /></w:rPr><w:t xml:space=\"preserve\">\"Fees\"</w:t></w:r><w:r><w:t xml:space=\"preserve\"> means the amounts set out in Schedule 1.</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||\"Fees\" means the amounts set out in Schedule 1."
       }
     },
     {
@@ -191,12 +209,14 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading2\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Interpretation. Headings are for convenience only.</w:t></w:r>",
         "caption": {
           "form": "plain",
           "punct": "."
         },
         "kind": "clause",
-        "level": 2
+        "level": 2,
+        "sig": "clause|2|Interpretation|Headings are for convenience only."
       }
     },
     {
@@ -209,12 +229,14 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading1\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Services</w:t></w:r>",
         "caption": {
           "form": "plain",
           "punct": ""
         },
         "kind": "clause",
-        "level": 1
+        "level": 1,
+        "sig": "clause|1|Services|"
       }
     },
     {
@@ -232,12 +254,14 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading2\" /></w:pPr>",
+        "content": "<w:r><w:rPr><w:b /></w:rPr><w:t xml:space=\"preserve\">Performance</w:t></w:r><w:r><w:t xml:space=\"preserve\">. Provider shall perform the Services:</w:t></w:r>",
         "caption": {
           "form": "b",
           "punct": "."
         },
         "kind": "clause",
-        "level": 2
+        "level": 2,
+        "sig": "clause|2|Performance|Provider shall perform the Services:"
       }
     },
     {
@@ -254,8 +278,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"0\" /><w:numId w:val=\"2\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">in a professional manner;</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||in a professional manner;"
       }
     },
     {
@@ -272,8 +298,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"0\" /><w:numId w:val=\"2\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">in accordance with applicable law, including:</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||in accordance with applicable law, including:"
       }
     },
     {
@@ -290,8 +318,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"1\" /><w:numId w:val=\"2\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">data protection law; and</w:t></w:r>",
         "kind": "clause",
-        "level": 4
+        "level": 4,
+        "sig": "clause|4||data protection law; and"
       }
     },
     {
@@ -308,8 +338,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"1\" /><w:numId w:val=\"2\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">export control law; and</w:t></w:r>",
         "kind": "clause",
-        "level": 4
+        "level": 4,
+        "sig": "clause|4||export control law; and"
       }
     },
     {
@@ -326,8 +358,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"0\" /><w:numId w:val=\"2\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">on the timeline agreed by the parties.</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||on the timeline agreed by the parties."
       }
     },
     {
@@ -364,8 +398,10 @@
       ],
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">This sentence continues Section 2.2 as an unnumbered paragraph.</w:t></w:r>",
         "kind": "text",
-        "level": 2
+        "level": 2,
+        "sig": "text|2||This sentence continues Section 2.2 as an unnumbered paragraph."
       }
     },
     {
@@ -378,12 +414,14 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading1\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Fees</w:t></w:r>",
         "caption": {
           "form": "plain",
           "punct": ""
         },
         "kind": "clause",
-        "level": 1
+        "level": 1,
+        "sig": "clause|1|Fees|"
       }
     },
     {
@@ -400,12 +438,14 @@
       "caption": "Payment",
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">3.1 Payment. Customer shall pay the Fees within 30 days of invoice.</w:t></w:r>",
         "caption": {
           "form": "plain",
           "punct": "."
         },
         "kind": "clause",
-        "level": 2
+        "level": 2,
+        "sig": "clause|2|Payment|Customer shall pay the Fees within 30 days of invoice."
       }
     },
     {
@@ -422,12 +462,14 @@
       "caption": "Late Payment",
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">3.2 Late Payment. Late amounts bear interest at 1% per month, provided that:</w:t></w:r>",
         "caption": {
           "form": "plain",
           "punct": "."
         },
         "kind": "clause",
-        "level": 2
+        "level": 2,
+        "sig": "clause|2|Late Payment|Late amounts bear interest at 1% per month, provided that:"
       }
     },
     {
@@ -443,8 +485,10 @@
       "source_number": "(a)",
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">(a) interest shall not exceed the maximum rate permitted by law; and</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||interest shall not exceed the maximum rate permitted by law; and"
       }
     },
     {
@@ -460,8 +504,10 @@
       "source_number": "(b)",
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">(b) no interest accrues on amounts disputed under Section 3.3.</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||no interest accrues on amounts disputed under Section 3.3."
       }
     },
     {
@@ -475,8 +521,10 @@
       ],
       "author": "import:services-agreement.docx",
       "word": {
+        "content": "<w:r><w:t xml:space=\"preserve\">Invoices are delivered:</w:t></w:r>",
         "kind": "text",
-        "level": 3
+        "level": 3,
+        "sig": "text|3||Invoices are delivered:"
       }
     },
     {
@@ -494,9 +542,11 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"0\" /><w:numId w:val=\"3\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">by email; or</w:t></w:r>",
         "bullet": true,
         "kind": "text",
-        "level": 3
+        "level": 3,
+        "sig": "text|3||• by email; or"
       }
     },
     {
@@ -514,9 +564,11 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"0\" /><w:numId w:val=\"3\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">by courier.</w:t></w:r>",
         "bullet": true,
         "kind": "text",
-        "level": 3
+        "level": 3,
+        "sig": "text|3||• by courier."
       }
     },
     {
@@ -529,12 +581,14 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading1\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Term</w:t></w:r>",
         "caption": {
           "form": "plain",
           "punct": ""
         },
         "kind": "clause",
-        "level": 1
+        "level": 1,
+        "sig": "clause|1|Term|"
       }
     },
     {
@@ -551,8 +605,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading2\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">This Agreement continues until terminated under Section 4.2.</w:t></w:r>",
         "kind": "clause",
-        "level": 2
+        "level": 2,
+        "sig": "clause|2||This Agreement continues until terminated under Section 4.2."
       }
     },
     {
@@ -569,8 +625,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"Heading2\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Either party may terminate on 30 days' notice, in which case:</w:t></w:r>",
         "kind": "clause",
-        "level": 2
+        "level": 2,
+        "sig": "clause|2||Either party may terminate on 30 days' notice, in which case:"
       }
     },
     {
@@ -587,8 +645,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"0\" /><w:numId w:val=\"4\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Customer pays for Services performed;</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||Customer pays for Services performed;"
       }
     },
     {
@@ -605,8 +665,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:numPr><w:ilvl w:val=\"0\" /><w:numId w:val=\"4\" /></w:numPr></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">Provider returns Customer materials.</w:t></w:r>",
         "kind": "clause",
-        "level": 3
+        "level": 3,
+        "sig": "clause|3||Provider returns Customer materials."
       }
     },
     {
@@ -621,8 +683,10 @@
       "author": "import:services-agreement.docx",
       "word": {
         "pPr": "<w:pPr><w:pStyle w:val=\"PlainHeading\" /></w:pPr>",
+        "content": "<w:r><w:t xml:space=\"preserve\">SCHEDULE 1</w:t></w:r>",
         "kind": "heading",
-        "level": 0
+        "level": 0,
+        "sig": "heading|0||SCHEDULE 1"
       }
     },
     {

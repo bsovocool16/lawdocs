@@ -406,6 +406,24 @@ def xml_str(el: ET.Element) -> str:
     return _NS_DECL.sub(lambda m: "" if _KNOWN_NS.get(m.group(1)) == m.group(2) else m.group(0), s)
 
 
+_TRACKED = {q("ins"), q("del"), q("moveFrom"), q("moveTo")}
+
+
+def _raw_content(p: ET.Element) -> str | None:
+    """A paragraph's children other than its properties, as XML. None when it
+    holds tracked changes, which the model has accepted and the raw XML hasn't."""
+    if any(el.tag in _TRACKED for el in p.iter()):
+        return None
+    return "".join(xml_str(c) for c in p if c.tag != q("pPr"))
+
+
+def signature(kind: str, level: int, caption: str | None, runs) -> str:
+    """What a block says, ignoring run splits and spacing, so an untouched
+    paragraph is recognised after a trip through Claude Docs."""
+    text = " ".join("".join(r.text for r in runs).split())
+    return f"{kind}|{level}|{' '.join((caption or '').split())}|{text}"
+
+
 class _Importer:
     def __init__(self, styles: dict[str, Style], numbering: Numbering, source: str):
         self.styles = styles
@@ -436,6 +454,8 @@ class _Importer:
                   author=f"import:{self.source}", **kw)
         word = {k: v for k, v in self._word.items() if v is not None}
         word.update(kind=kind, level=level)
+        if "content" in word:
+            word["sig"] = signature(kind, level, kw.get("caption"), runs)
         b.word = word
         self._word = {}
         self.blocks.append(b)
@@ -516,6 +536,15 @@ class _Importer:
         style_id = _val(ppr.find("w:pStyle", NS)) if ppr is not None else None
         runs = _runs(p, self.footnote)
         self._word = {"pPr": xml_str(ppr) if ppr is not None else None}
+        # The paragraph's own runs, fields, hyperlinks and bookmarks, written back
+        # verbatim while its text is unchanged (so underlining, small caps,
+        # live cross-references and the like survive the round trip).
+        content = _raw_content(p)
+        sep_content = _raw_content(sep) if sep is not None else ""
+        if content is not None and sep_content is not None:
+            self._word["content"] = content
+            if sep is not None:
+                self._word["sep_content"] = sep_content
         marks = _bookmarks(p) + (_bookmarks(sep) if sep is not None else [])
         if marks:
             self._word["bookmarks"] = marks
@@ -583,7 +612,7 @@ class _Importer:
             for tc in tr.findall("w:tc", NS):
                 parts = []
                 for p in tc.iter(q("p")):
-                    t = "".join(r.text for r in _runs(p))
+                    t = "".join(r.text for r in _runs(p, self.footnote))
                     if t:
                         parts.append(t)
                     if p.find("w:pPr/w:numPr", NS) is not None:

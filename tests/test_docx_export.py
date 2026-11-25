@@ -74,3 +74,43 @@ def test_spacers_and_section_properties_survive(src, tmp_path):
     out = export_docx(doc, src, tmp_path / "out.docx")
     xml = zipfile.ZipFile(out).read("word/document.xml").decode()
     assert re.search(r"<w:sectPr>.*</w:sectPr></w:body>", xml)
+
+
+FIELD = ('<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> REF _Ref1 \\r \\h </w:instrText></w:r>'
+         '<w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>1.1</w:t></w:r>'
+         '<w:r><w:fldChar w:fldCharType="end"/></w:r>')
+
+
+def _fielded(tmp_path):
+    return write_docx(tmp_path / "f.docx", [
+        para({"text": "Scope", "style": "Heading1"}),
+        para({"style": "Heading2", "runs": [("Term. See Section ", "")],
+              "tail": FIELD + '<w:r><w:rPr><w:smallCaps/></w:rPr><w:t xml:space="preserve"> below</w:t></w:r>' + footnote_ref(5)}),
+        para({"style": "Heading2", "runs": [("Fees. Paid monthly.", "")]}),
+    ], footnotes={5: "Adjust as needed."})
+
+
+def test_untouched_paragraphs_keep_their_word_content(tmp_path):
+    src = _fielded(tmp_path)
+    doc = import_docx(src)
+    stats: dict = {}
+    out = export_docx(doc, src, tmp_path / "out.docx", stats)
+    xml = zipfile.ZipFile(out).read("word/document.xml").decode()
+    assert "REF _Ref1" in xml and "<w:smallCaps" in xml   # field and run formatting survive
+    assert stats["rebuilt"] == 0
+    fid = re.search(r'footnoteReference w:id="(\d+)"', xml).group(1)
+    notes = zipfile.ZipFile(out).read("word/footnotes.xml").decode()
+    assert f'w:id="{fid}"' in notes  # reference points at the rewritten footnote
+
+
+def test_edited_paragraph_is_rebuilt(tmp_path):
+    src = _fielded(tmp_path)
+    doc = import_docx(src)
+    fees = next(b for b in doc.blocks if (b.caption or "").startswith("Fees") or b.text.startswith("Fees"))
+    fees.runs = [Run("Paid quarterly.")]
+    stats: dict = {}
+    out = export_docx(doc, src, tmp_path / "out.docx", stats)
+    assert stats["rebuilt"] == 1
+    again = import_docx(out)
+    assert any("Paid quarterly." in b.text for b in again.blocks)
+    assert "REF _Ref1" in zipfile.ZipFile(out).read("word/document.xml").decode()

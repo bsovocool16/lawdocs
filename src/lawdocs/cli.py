@@ -58,8 +58,10 @@ def cmd_export(args: argparse.Namespace) -> int:
             print("No template: pass --template <file.docx>.", file=sys.stderr)
             return 2
         template = Path(args.model).parent / pkg
-    out = export_docx(doc, template, args.out)
-    print(f"Wrote {out} using {template} as the template")
+    stats: dict = {}
+    out = export_docx(doc, template, args.out, stats)
+    print(f"Wrote {out} using {template} as the template "
+          f"({stats['verbatim']} paragraphs kept as they were, {stats['rebuilt']} rebuilt)")
     return 0
 
 

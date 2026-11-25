@@ -29,6 +29,7 @@ from collections import Counter
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from .docx_import import signature
 from .model import Block, Document, Run, note_number
 from .numbering import apply
 
@@ -114,6 +115,13 @@ def _with_numbering(ppr: str | None, level: int) -> str:
     return ppr
 
 
+def _table_text(rows: list[list[str]] | None) -> list[list[str]]:
+    """Cell text without blank rows (Claude Docs drops empty rows, such as the
+    blank line a schedule leaves for filling in) or spacing differences."""
+    out = [[" ".join(c.split()) for c in r] for r in rows or []]
+    return [r for r in out if any(r)]
+
+
 def _unhide_mark(ppr: str) -> str:
     return re.sub(r"<w:(?:spec)?[vV]anish\s*/>", "", ppr)
 
@@ -141,8 +149,10 @@ class _Writer:
         self.tpl = tpl
         self.needs_fallback = False
         self.note_ids: dict[int, int] = {}
+        self.source_note_ids: dict[str, int] = {}  # footnote id in the source -> id in the output
         self.fn_style = tpl.has_style("FootnoteReference")
         self.next_bookmark = 900000
+        self.verbatim = self.rebuilt = 0
         self.profile = self._learn_profile()
 
     # The template's house style for each kind and level, learned from the
@@ -206,11 +216,47 @@ class _Writer:
             out.append(f'<w:bookmarkStart w:id="{i}" w:name="{_attr(name)}"/><w:bookmarkEnd w:id="{i}"/>')
         return "".join(out)
 
-    def paragraph(self, b: Block) -> str:
-        ppr = (self._ppr_for(b) or "") + self._bookmarks(b)
+    def _verbatim(self, b: Block, ppr: str | None) -> str | None:
+        """The source paragraph(s) as they were, when the block is unchanged:
+        same kind, level, properties and text."""
         w = b.word or {}
+        if "content" not in w or w.get("sig") != signature(b.kind, b.level, b.caption, b.runs):
+            return None
+        if (ppr or None) != (w.get("pPr") or None):
+            return None  # numbering had to be added: rebuild
+
+        ok = True
+
+        def note_id(m: re.Match) -> str:
+            nonlocal ok
+            new = self.source_note_ids.get(m.group(1))
+            if new is None:
+                ok = False
+                return m.group(0)
+            return f'<w:footnoteReference w:id="{new}"'
+
+        content = re.sub(r'<w:footnoteReference w:id="(-?\d+)"', note_id, w["content"])
+        sep = re.sub(r'<w:footnoteReference w:id="(-?\d+)"', note_id, w.get("sep_content", ""))
+        if not ok:
+            return None
+        ppr = ppr or ""
+        if "sep_content" in w:
+            return f"<w:p>{ppr}{content}</w:p><w:p>{w.get('sep_pPr') or ''}{sep}</w:p>"
+        return f"<w:p>{ppr}{content}</w:p>"
+
+    def paragraph(self, b: Block) -> str:
+        w = b.word or {}
+        base_ppr = self._ppr_for(b)
+        if not w.get("label_only"):
+            raw = self._verbatim(b, base_ppr)
+            if raw is not None:
+                self.verbatim += 1
+                return raw
+        ppr = (base_ppr or "") + self._bookmarks(b)
         if w.get("label_only") and w.get("kind") == b.kind:
+            self.verbatim += 1  # Word draws the whole paragraph from its numbering
             return f"<w:p>{ppr}</w:p>"
+        self.rebuilt += 1
         if w.get("bullet") and w.get("kind") == b.kind and w.get("level") == b.level and b.runs:
             b = Block(b.id, b.kind, b.level, [Run(b.runs[0].text.lstrip("\u2022 "), b.runs[0].bold, b.runs[0].italic)] + b.runs[1:])
         if b.kind != "clause" or not b.caption:
@@ -234,8 +280,9 @@ class _Writer:
     def table(self, b: Block) -> str:
         w = b.word or {}
         raw = w.get("tbl")
-        if raw and w.get("rows") == b.rows:
-            return raw
+        if raw and _table_text(w.get("rows")) == _table_text(b.rows):
+            return re.sub(r'<w:footnoteReference w:id="(-?\d+)"',
+                          lambda m: f'<w:footnoteReference w:id="{self.source_note_ids.get(m.group(1), m.group(1))}"', raw)
         tblpr = re.search(r"<w:tblPr>.*?</w:tblPr>", raw or "", re.S)
         tblpr = tblpr.group(0) if tblpr else (
             '<w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>'
@@ -273,6 +320,9 @@ class _Writer:
             self.note_ids[note["n"]] = fid
             raw_note = note.get("word")
             if raw_note:
+                src = re.search(r'w:id="(-?\d+)"', raw_note)
+                if src:
+                    self.source_note_ids[src.group(1)] = fid
                 body.append(re.sub(r'w:id="-?\d+"', f'w:id="{fid}"', raw_note, count=1))
             else:
                 ref = '<w:rStyle w:val="FootnoteReference"/>' if self.fn_style else '<w:vertAlign w:val="superscript"/>'
@@ -282,7 +332,7 @@ class _Writer:
         return head + "".join(specials) + "".join(body) + "</w:footnotes>"
 
 
-def export_docx(doc: Document, template: str | Path, out: str | Path) -> Path:
+def export_docx(doc: Document, template: str | Path, out: str | Path, stats: dict | None = None) -> Path:
     apply(doc)
     tpl = Template(template)
     w = _Writer(doc, tpl)
@@ -295,6 +345,8 @@ def export_docx(doc: Document, template: str | Path, out: str | Path) -> Path:
         parts["word/footnotes.xml"] = footnotes.encode("utf8")
     if w.needs_fallback:
         parts["word/numbering.xml"] = _add_fallback_numbering(parts.get("word/numbering.xml"))
+    if stats is not None:
+        stats.update(verbatim=w.verbatim, rebuilt=w.rebuilt)
     out = Path(out)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in parts.items():

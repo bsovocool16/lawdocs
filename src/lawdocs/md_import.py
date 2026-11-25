@@ -212,10 +212,13 @@ def pull(md: str, base: Document, editor: str = "docs") -> Document:
             for nb in new.blocks[j1:j2]:
                 nb.author = editor
     # Footnotes keep their Word formatting when their text is unchanged.
-    old_notes = {n["text"]: n for n in base.notes}
-    for n in new.notes:
-        if n["text"] in old_notes and old_notes[n["text"]].get("word"):
-            n["word"] = old_notes[n["text"]]["word"]
+    # Aligned in order, because the same note text can appear more than once.
+    nm = difflib.SequenceMatcher(a=[n["text"] for n in base.notes], b=[n["text"] for n in new.notes], autojunk=False)
+    for blk in nm.get_matching_blocks():
+        for k in range(blk.size):
+            old_note = base.notes[blk.a + k]
+            if old_note.get("word"):
+                new.notes[blk.b + k]["word"] = old_note["word"]
     new.template = base.template
     new.source = base.source
     num.apply(new)
@@ -227,5 +230,9 @@ def _carry(old: Block, nb: Block, edited: str | None) -> None:
     nb.word = old.word
     nb.source_number = old.source_number
     nb.author = edited or old.author
+    if old.kind == nb.kind == "text":
+        # Markdown can't say which clause a plain paragraph belongs to, so the
+        # level guessed from its neighbours must not override the known one.
+        nb.level = old.level
     if old.kind == "table" and old.rows and nb.rows and len(old.rows) == len(nb.rows):
         nb.rows = nb.rows  # cell text from the doc wins
