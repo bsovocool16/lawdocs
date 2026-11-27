@@ -121,9 +121,12 @@ def _norm(label: str | None) -> str:
 
 def _table_text(rows: list[list[str]] | None) -> list[list[str]]:
     """Cell text without blank rows (Claude Docs drops empty rows, such as the
-    blank line a schedule leaves for filling in) or spacing differences."""
+    blank line a schedule leaves for filling in), spacing differences or empty
+    cells at the end of a row (Markdown pads a row with merged cells out to
+    the table's width)."""
     out = [[" ".join(c.split()) for c in r] for r in rows or []]
-    return [r for r in out if any(r)]
+    out = [r[:max((i + 1 for i, c in enumerate(r) if c), default=0)] for r in out]
+    return [r for r in out if r]
 
 
 def _unhide_mark(ppr: str) -> str:
