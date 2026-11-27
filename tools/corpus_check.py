@@ -28,11 +28,12 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import zipfile
 from pathlib import Path
 
 from lawdocs import md_import, outline
 from lawdocs import render as md_render
-from lawdocs.docx_export import export_docx
+from lawdocs.docx_export import _table_text, export_docx
 from lawdocs.docx_import import import_docx
 from lawdocs.numbering import split_typed_number
 
@@ -44,7 +45,17 @@ def _refs(doc):
 
 
 def _texts(doc):
-    return [(b.kind, " ".join((b.caption or "").split()), " ".join(b.text.split())) for b in doc.blocks]
+    # Table cells count as text: a table's own text is empty, so without its
+    # rows a lost or changed cell would go unnoticed (found by corpus_selftest).
+    # Compared the way the export compares them, so blank rows and the padding
+    # Markdown adds don't count.
+    return [(b.kind, " ".join((b.caption or "").split()), " ".join(b.text.split()),
+             tuple(map(tuple, _table_text(b.rows)))) for b in doc.blocks]
+
+
+def _document_xml(docx: Path) -> bytes:
+    with zipfile.ZipFile(docx) as z:
+        return z.read("word/document.xml")
 
 
 def _norm_number(s: str | None) -> str:
@@ -80,8 +91,8 @@ def _office_labels(docx: Path, doc, work: Path) -> dict | None:
     if not txt.exists():
         return None
     lines = [" ".join(ln.replace("\u00a0", " ").split()) for ln in txt.read_text(encoding="utf-8-sig").splitlines()]
-    pos, found, differ = 0, 0, []
-    for b in doc.clauses():
+    pos, found, differ, checked, differ_at = 0, 0, [], [], []
+    for ci, b in enumerate(doc.clauses()):
         words = " ".join(re.split(r"[\u00b9\u00b2\u00b3\u2070-\u2079]", ((b.caption or "") + " " + b.text).strip())[0].split())
         words = words.lstrip("[“\"")[:40]
         if len(words) < 12:
@@ -92,14 +103,16 @@ def _office_labels(docx: Path, doc, work: Path) -> dict | None:
                 label = lines[i][:k].strip().rstrip("[“\"‘'(- ").strip()
                 if _LABELISH.fullmatch(label):
                     found += 1
+                    checked.append(ci)
                     if _norm_number(label) != _norm_number(b.number):
                         differ.append(f"{label} -> {b.number}")
+                        differ_at.append(ci)
                 pos = i + 1
                 break
             if k == 0:
                 pos = i + 1
                 break
-    return {"compared": found, "differ": differ}
+    return {"compared": found, "differ": differ, "checked": checked, "differ_at": differ_at}
 
 
 def _render(docx: Path, out_dir: Path) -> Path | None:
@@ -172,6 +185,10 @@ def check(path: Path, out: Path, render: bool) -> dict:
             r["trace"] = traceback.format_exc()
             return r
         r["kept_verbatim"] = stats.get("verbatim")
+        # What the Claude Docs read-back would export: it should be the same file.
+        via_docs = work / "via-docs.docx"
+        export_docx(pulled, path, via_docs)
+        r["docs_export_match"] = _document_xml(via_docs) == _document_xml(exported)
         r["rebuilt"] = stats.get("rebuilt")
         try:
             again = import_docx(exported)
@@ -182,6 +199,9 @@ def check(path: Path, out: Path, render: bool) -> dict:
             return r
         if render:
             r["office_numbers"] = _office_labels(path, doc, work)
+            if r["office_numbers"]:
+                r["office_numbers"].pop("checked")
+                r["office_numbers"].pop("differ_at")
             src_copy = work / ("source-" + path.name)
             shutil.copyfile(path, src_copy)
             a = _render(src_copy, work)
@@ -198,7 +218,7 @@ def verdict(r: dict) -> str:
     pages = r.get("pages") or {}
     if not r.get("refs_match") or not r.get("text_match"):
         return "FAIL"
-    if not r.get("docs_refs_match") or not r.get("docs_text_match"):
+    if not r.get("docs_refs_match") or not r.get("docs_text_match") or r.get("docs_export_match") is False:
         return "FAIL"
     office = r.get("office_numbers") or {}
     # LibreOffice's reading is independent of lawdocs', so it decides when it
@@ -236,6 +256,7 @@ def report_md(results: list[dict]) -> str:
                         f"{len(r['office_numbers']['differ'])} of {r['office_numbers']['compared']} numbers differ from LibreOffice"
                         if (r.get("office_numbers") or {}).get("differ") else "",
                         "Markdown pull changes structure" if not (r.get("docs_refs_match") and r.get("docs_text_match")) else "",
+                        "Markdown pull changes the exported Word file" if r.get("docs_export_match") is False else "",
                         f"{len(r['skipped_levels'])} skipped levels" if r.get("skipped_levels") else "",
                         f"{len(r['plain_but_numbered'])} numbered-looking plain paragraphs" if r.get("plain_but_numbered") else ""]
             if x)

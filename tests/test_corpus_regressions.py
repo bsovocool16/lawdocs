@@ -296,3 +296,23 @@ def test_typed_number_typo_kept_until_edited(tmp_path):
     out = export_docx(doc, src, tmp_path / "edited.docx")
     xml = zipfile.ZipFile(out).read("word/document.xml").decode()
     assert ">2.3 <" in xml and "5.3" not in xml
+
+
+# Markdown pads a row with merged cells out to the table's width, so after a
+# read-back from Claude Docs the cells no longer matched the saved Word table
+# and the export rebuilt it plainly, losing merged cells, widths and shading
+# (oneNDA, NVCA IRA questionnaire, MSC schedules). Found by tools/corpus_selftest.py.
+def test_a_table_with_merged_cells_survives_the_docs_read_back(tmp_path):
+    from docxgen import table
+
+    merged = ('<w:tbl><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>Parties</w:t></w:r></w:p></w:tc></w:tr>'
+              '<w:tr><w:tc><w:p><w:r><w:t>Discloser</w:t></w:r></w:p></w:tc>'
+              '<w:tc><w:p><w:r><w:t>Receiver</w:t></w:r></w:p></w:tc></w:tr></w:tbl>')
+    src = write_docx(tmp_path / "t.docx", [para({"text": "Terms", "style": "Heading1"}), merged,
+                                           table([["Fee", "5,000"]])])
+    doc = import_docx(src)
+    pulled = md_import.pull(render.to_markdown(doc), doc)
+    a = zipfile.ZipFile(export_docx(doc, src, tmp_path / "a.docx")).read("word/document.xml")
+    b = zipfile.ZipFile(export_docx(pulled, src, tmp_path / "b.docx")).read("word/document.xml")
+    assert b'<w:gridSpan w:val="2"' in b
+    assert a == b

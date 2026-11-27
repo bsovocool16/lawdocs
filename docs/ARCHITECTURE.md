@@ -93,6 +93,13 @@ check, `tools/corpus_check.py` runs import, the Claude Docs read-back and
 export over a folder of documents and compares numbers with what
 LibreOffice shows and pages pixel by pixel.
 
+`tools/corpus_selftest.py` checks the checker. It breaks each document on
+purpose (drops or swaps a paragraph, changes a digit or a word, moves a list
+item down a level, widens a margin, loses a paragraph on the way back from
+Claude Docs, misreads one clause number) and confirms that one of
+corpus_check's comparisons notices, using the unbroken export as the
+control. Any break that goes unnoticed is a blind spot in the harness.
+
 ## Numbers
 
 Only counters come from structure. How a clause's number is written is its
